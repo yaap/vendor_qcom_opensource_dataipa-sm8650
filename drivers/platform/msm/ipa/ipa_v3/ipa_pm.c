@@ -905,7 +905,7 @@ int ipa_pm_associate_ipa_cons_to_client(u32 hdl, enum ipa_client_type consumer)
 		return -EPERM;
 	}
 
-	idx = ipa3_get_ep_mapping(consumer);
+	idx = ipa_get_ep_mapping(consumer);
 
 	if (idx < 0) {
 		mutex_unlock(&ipa_pm_ctx->client_mutex);
@@ -1554,7 +1554,7 @@ bool ipa_get_pm_client_stats_filled(struct pm_client_stats *pm_stats_ptr,
 
 int ipa_pm_get_pm_clnt_throughput(enum ipa_client_type client_type)
 {
-	int idx = ipa3_get_ep_mapping(client_type);
+	int idx = ipa_get_ep_mapping(client_type);
 	int throughput;
 
 	mutex_lock(&ipa_pm_ctx->client_mutex);

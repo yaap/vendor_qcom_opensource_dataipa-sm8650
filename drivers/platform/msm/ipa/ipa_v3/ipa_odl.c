@@ -327,7 +327,7 @@ int ipa_setup_odl_pipe(void)
 		ipa_odl_ep_cfg->ipa_ep_cfg.hdr.hdr_len = 0;
 	}
 
-	ret = ipa3_setup_sys_pipe(ipa_odl_ep_cfg,
+	ret = ipa_setup_sys_pipe(ipa_odl_ep_cfg,
 			&ipa3_odl_ctx->odl_client_hdl);
 	return ret;
 
@@ -497,7 +497,7 @@ void ipa3_odl_pipe_cleanup(bool is_ssr)
 	/*Since init will not be done again*/
 	ipa3_odl_ctx->odl_state.odl_init = true;
 
-	ipa3_teardown_sys_pipe(ipa3_odl_ctx->odl_client_hdl);
+	ipa_teardown_sys_pipe(ipa3_odl_ctx->odl_client_hdl);
 	ipa3_odl_ctx->odl_client_hdl = -1;
 	/*Assume QTI will never close this node once opened*/
 	if (ipa_odl_opened)
