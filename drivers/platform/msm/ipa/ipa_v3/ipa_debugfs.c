@@ -3400,7 +3400,6 @@ static ssize_t ipa3_read_tsp(struct file *file, char __user *buf, size_t count, 
 
 static ssize_t ipa3_write_tsp(struct file *file, const char __user *buf,
 			      size_t count, loff_t *ppos) {
-
 	int ret;
 	u8 option = 0;
 
@@ -3416,6 +3415,129 @@ static ssize_t ipa3_write_tsp(struct file *file, const char __user *buf,
 	return count;
 }
 #endif
+
+static ssize_t ipa3_perform_loopback(struct file *file, char __user *ubuf,
+		size_t count, loff_t *ppos)
+{
+	struct ipa_ioc_add_rt_rule *rt_rule;
+	struct ipa_ioc_add_flt_rule *flt_rule;
+	struct ipa_ioc_get_rt_tbl rt_lookup;
+	int idx;
+	u32 rt4_wan_cons;
+	u32 rt6_wan_cons;
+	struct ipahal_reg_ep_cfg_status ep_status = { 0 };
+
+	IPAERR("Adding rules to perform loopback on IPA\n");
+
+	/* set this flag to false so flt rule dont get skipped for WAN_PROD */
+	ipa3_ctx->modem_cfg_emb_pipe_flt = false;
+
+	idx = ipa_get_ep_mapping(IPA_CLIENT_APPS_WAN_PROD);
+	if (idx == IPA_EP_NOT_ALLOCATED) {
+		IPAERR("failed to get idx");
+		return idx;
+	}
+
+	ipa3_ctx->ep[idx].cfg.hdr.hdr_ofst_metadata = 1;
+	ipa3_cfg_ep_hdr(idx, &ipa3_ctx->ep[idx].cfg.hdr);
+
+	ipa3_cfg_ep_status(idx, &ep_status);
+
+	rt_rule = kzalloc(sizeof(*rt_rule) + 1 * sizeof(struct ipa_rt_rule_add),
+		GFP_KERNEL);
+	if (!rt_rule) {
+		IPAERR("no mem\n");
+		return 0;
+	}
+
+	flt_rule = kzalloc(sizeof(*flt_rule) +
+		1 * sizeof(struct ipa_flt_rule_add), GFP_KERNEL);
+	if (!flt_rule) {
+		IPAERR("no mem\n");
+		goto free_rt;
+	}
+
+	rt_rule->commit = 1;
+	rt_rule->ip = IPA_IP_v4;
+	rt_lookup.ip = rt_rule->ip;
+	strlcpy(rt_rule->rt_tbl_name, "V4_RT_TO_APPS_WAN_CONS",
+		IPA_RESOURCE_NAME_MAX);
+	strlcpy(rt_lookup.name, rt_rule->rt_tbl_name, IPA_RESOURCE_NAME_MAX);
+	rt_rule->num_rules = 1;
+	rt_rule->rules[0].rule.dst = IPA_CLIENT_APPS_WAN_CONS;
+	rt_rule->rules[0].rule.hashable = true;
+	#ifdef IPA_RT_SUPPORT_COAL
+		rt_rule->rules[0].rule.coalesce = true;
+	#endif
+	if (ipa_add_rt_rule(rt_rule) || rt_rule->rules[0].status) {
+		IPAERR("failed to install V4 rules\n");
+		goto free_flt;
+	}
+	if (ipa3_get_rt_tbl(&rt_lookup)) {
+		IPAERR("failed to query V4 rules\n");
+		goto free_flt;
+	}
+	rt4_wan_cons = rt_lookup.hdl;
+
+	memset(rt_rule, 0, sizeof(*rt_rule));
+	rt_rule->commit = 1;
+	rt_rule->ip = IPA_IP_v6;
+	rt_lookup.ip = rt_rule->ip;
+	strlcpy(rt_rule->rt_tbl_name, "V6_RT_TO_APPS_WAN_CONS",
+		IPA_RESOURCE_NAME_MAX);
+	strlcpy(rt_lookup.name, rt_rule->rt_tbl_name, IPA_RESOURCE_NAME_MAX);
+	rt_rule->num_rules = 1;
+	rt_rule->rules[0].rule.dst = IPA_CLIENT_APPS_WAN_CONS;
+	rt_rule->rules[0].rule.hashable = true;
+	#ifdef IPA_RT_SUPPORT_COAL
+		rt_rule->rules[0].rule.coalesce = true;
+	#endif
+	if (ipa_add_rt_rule(rt_rule) || rt_rule->rules[0].status) {
+		IPAERR("failed to install V6 rules\n");
+		goto free_flt;
+	}
+	if (ipa3_get_rt_tbl(&rt_lookup)) {
+		IPAERR("failed to query V6 rules\n");
+		goto free_flt;
+	}
+	rt6_wan_cons = rt_lookup.hdl;
+
+	memset(flt_rule, 0, sizeof(*flt_rule));
+	flt_rule->commit = 1;
+	flt_rule->ip = IPA_IP_v4;
+	flt_rule->ep = IPA_CLIENT_APPS_WAN_PROD;
+	flt_rule->num_rules = 1;
+	flt_rule->rules[0].at_rear = 1;
+	flt_rule->rules[0].rule.action = IPA_PASS_TO_ROUTING;
+	flt_rule->rules[0].rule.rt_tbl_hdl = rt4_wan_cons;
+	flt_rule->rules[0].rule.hashable = 1;
+	if (ipa3_add_flt_rule(flt_rule) || flt_rule->rules[0].status) {
+		IPAERR("failed to install V4 rules\n");
+		goto free_flt;
+	}
+
+	memset(flt_rule, 0, sizeof(*flt_rule));
+	flt_rule->commit = 1;
+	flt_rule->ip = IPA_IP_v6;
+	flt_rule->ep = IPA_CLIENT_APPS_WAN_PROD;
+	flt_rule->num_rules = 1;
+	flt_rule->rules[0].at_rear = 1;
+	flt_rule->rules[0].rule.action = IPA_PASS_TO_ROUTING;
+	flt_rule->rules[0].rule.rt_tbl_hdl = rt6_wan_cons;
+	flt_rule->rules[0].rule.hashable = 1;
+	if (ipa3_add_flt_rule(flt_rule) || flt_rule->rules[0].status) {
+		IPAERR("failed to install V6 rules\n");
+		goto free_flt;
+	}
+
+
+free_flt:
+	kfree(flt_rule);
+free_rt:
+	kfree(rt_rule);
+	return 0;
+}
+
 static const struct ipa3_debugfs_file debugfs_files[] = {
 	{
 		"gen_reg", IPA_READ_ONLY_MODE, NULL, {
@@ -3647,7 +3769,11 @@ static const struct ipa3_debugfs_file debugfs_files[] = {
 			.write = ipa3_write_tsp,
 		}
 #endif
-	},
+	},	{
+		"ipa_loopback_on_ipa", IPA_READ_ONLY_MODE, NULL, {
+			.read = ipa3_perform_loopback,
+		}
+	}
 };
 
 void ipa3_debugfs_init(void)
