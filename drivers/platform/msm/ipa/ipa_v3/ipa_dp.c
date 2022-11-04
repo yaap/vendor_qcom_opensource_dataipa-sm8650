@@ -1730,7 +1730,7 @@ int ipa3_setup_sys_pipe(struct ipa_sys_connect_params *sys_in, u32 *clnt_hdl)
 					sys_in->client == IPA_CLIENT_APPS_WAN_COAL_CONS)
 					ep->sys->page_recycle_repl->capacity =
 							(ep->sys->rx_pool_sz + 1) *
-							IPA_GENERIC_RX_CMN_PAGE_POOL_SZ_FACTOR;
+							ipa3_ctx->ipa_gen_rx_cmn_page_pool_sz_factor;
 				else
 					ep->sys->page_recycle_repl->capacity =
 							(ep->sys->rx_pool_sz + 1) *
@@ -1759,7 +1759,7 @@ int ipa3_setup_sys_pipe(struct ipa_sys_connect_params *sys_in, u32 *clnt_hdl)
 			if (ipa3_ctx->wan_common_page_pool &&
 				sys_in->client == IPA_CLIENT_APPS_WAN_COAL_CONS)
 				ep->sys->repl->capacity = (ep->sys->rx_pool_sz + 1) *
-				IPA_GENERIC_RX_CMN_TEMP_POOL_SZ_FACTOR;
+				ipa3_ctx->ipa_gen_rx_cmn_temp_pool_sz_factor;
 			else
 				ep->sys->repl->capacity = (ep->sys->rx_pool_sz + 1);
 			IPADBG("Repl capacity for client:%d, value:%d\n",
@@ -2481,7 +2481,7 @@ int ipa3_tx_dp(enum ipa_client_type dst, struct sk_buff *skb,
 		}
 		if (num_frags == 0) {
 			if (ipa3_send(sys, data_idx + 1, desc, true)) {
-				IPAERR("fail to send skb %pK HWP\n", skb);
+				IPAERR_RL("fail to send skb %pK HWP\n", skb);
 				goto fail_mem;
 			}
 		} else {
@@ -2501,7 +2501,7 @@ int ipa3_tx_dp(enum ipa_client_type dst, struct sk_buff *skb,
 
 			if (ipa3_send(sys, num_frags + data_idx + 1,
 				desc, true)) {
-				IPAERR("fail to send skb %pK num_frags %u\n",
+				IPAERR_RL("fail to send skb %pK num_frags %u\n",
 					skb, num_frags);
 				goto fail_mem;
 			}
@@ -5250,7 +5250,8 @@ static struct sk_buff *handle_skb_completion(
 
 	/* Check added for handling LAN consumer packet without EOT flag */
 	if (notify->evt_id == GSI_CHAN_EVT_EOT ||
-		sys->ep->client == IPA_CLIENT_APPS_LAN_CONS) {
+		sys->ep->client == IPA_CLIENT_APPS_LAN_CONS ||
+		sys->ep->client == IPA_CLIENT_APPS_LAN_COAL_CONS) {
 		/* go over the list backward to save computations on updating length */
 		list_for_each_entry_safe_reverse(rx_pkt, tmp, head, link) {
 			rx_skb = rx_pkt->data.skb;
@@ -6038,7 +6039,7 @@ int ipa3_tx_dp_mul(enum ipa_client_type src,
 
 		IPADBG_LOW("calling ipa3_send()\n");
 		if (ipa3_send(sys, 2, desc, true)) {
-			IPAERR("fail to send skb\n");
+			IPAERR_RL("fail to send skb\n");
 			sys->ep->wstats.rx_pkt_leak += (cnt-1);
 			sys->ep->wstats.rx_dp_fail++;
 			goto fail_send;
