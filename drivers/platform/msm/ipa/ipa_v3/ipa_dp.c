@@ -171,9 +171,9 @@ static void ipa3_collect_default_coal_recycle_stats_wq(struct work_struct *work)
 	int ep_idx = -1;
 
 	/* For targets which don't require coalescing pipe */
-	ep_idx = ipa3_get_ep_mapping(IPA_CLIENT_APPS_WAN_COAL_CONS);
+	ep_idx = ipa_get_ep_mapping(IPA_CLIENT_APPS_WAN_COAL_CONS);
 	if (ep_idx == -1)
-		ep_idx = ipa3_get_ep_mapping(IPA_CLIENT_APPS_WAN_CONS);
+		ep_idx = ipa_get_ep_mapping(IPA_CLIENT_APPS_WAN_CONS);
 
 	if (ep_idx == -1)
 		sys = NULL;
@@ -257,7 +257,7 @@ static void ipa3_collect_low_lat_data_recycle_stats_wq(struct work_struct *work)
 	int stat_interval_index;
 	int ep_idx;
 
-	ep_idx = ipa3_get_ep_mapping(IPA_CLIENT_APPS_WAN_LOW_LAT_DATA_CONS);
+	ep_idx = ipa_get_ep_mapping(IPA_CLIENT_APPS_WAN_LOW_LAT_DATA_CONS);
 	if (ep_idx == -1)
 		sys = NULL;
 	else
