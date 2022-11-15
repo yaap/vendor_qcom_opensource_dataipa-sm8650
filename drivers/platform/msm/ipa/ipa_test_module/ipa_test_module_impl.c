@@ -87,7 +87,6 @@
 #define EXCEPTION_KFIFO_SIZE (8)
 #define EXCEPTION_KFIFO_SLEEP_MS (EXCEPTION_KFIFO_SLEEP_MS)
 #define EXCEPTION_KFIFO_DEBUG_VERBOSE 1
-#define SAVE_HEADER 1
 
 #define IPATEST_DBG(fmt, args...) \
 	do { \
@@ -2625,13 +2624,8 @@ void notify_upon_exception(void *priv,
 		return;
 	}
 
-#if (SAVE_HEADER)
-	data_len = p_sk_buff->len + 8; /* store len */
-	p_data = (p_sk_buff->data) - 8; /* store pointer to the data */
-#else
 	data_len = p_sk_buff->len; /* store len */
 	p_data = p_sk_buff->data; /* store pointer to the data */
-#endif
 
 #if (EXCEPTION_KFIFO_DEBUG_VERBOSE)
 		IPATEST_DBG("Exception packet length = %zu,Packet content:\n",

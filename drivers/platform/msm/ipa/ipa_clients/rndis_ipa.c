@@ -229,7 +229,7 @@ struct rndis_ipa_dev {
 	u32 outstanding_low;
 	u32 error_msec_sleep_time;
 	enum rndis_ipa_state state;
-	u8 host_ethaddr[ETH_ALEN];
+	u8  host_ethaddr[ETH_ALEN];
 	u8 device_ethaddr[ETH_ALEN];
 	void (*device_ready_notify)(void);
 	struct delayed_work xmit_error_delayed_work;
@@ -641,7 +641,7 @@ int rndis_ipa_init(struct ipa_usb_init_params *params)
 	rndis_ipa_debugfs_init(rndis_ipa_ctx);
 
 	result = rndis_ipa_set_device_ethernet_addr
-		(net->dev_addr, rndis_ipa_ctx->device_ethaddr);
+		((u8 *)net->dev_addr, rndis_ipa_ctx->device_ethaddr);
 	if (result) {
 		RNDIS_IPA_ERROR("set device MAC failed\n");
 		goto fail_set_device_ethernet;
@@ -708,7 +708,11 @@ int rndis_ipa_init(struct ipa_usb_init_params *params)
 		rndis_ipa_ctx->netif_rx_function = netif_receive_skb;
 		RNDIS_IPA_DEBUG("LAN RX NAPI enabled = True");
 	} else {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
 		rndis_ipa_ctx->netif_rx_function = netif_rx_ni;
+#else
+		rndis_ipa_ctx->netif_rx_function = netif_rx;
+#endif
 		RNDIS_IPA_DEBUG("LAN RX NAPI enabled = False");
 	}
 

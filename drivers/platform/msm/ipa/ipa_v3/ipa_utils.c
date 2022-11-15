@@ -4186,7 +4186,7 @@ static const struct ipa_ep_configuration ipa3_ep_mapping
 			IPA_TX_INSTANCE_NA },
 	[IPA_5_0][IPA_CLIENT_WLAN3_PROD] = {
 			true,   IPA_v5_0_GROUP_UL,
-			true,
+			false,
 			IPA_DPS_HPS_SEQ_TYPE_2ND_PKT_PROCESS_PASS_NO_DEC_UCP,
 			QMB_MASTER_SELECT_DDR,
 			{ 1 , 0, 8, 16, IPA_EE_AP, GSI_SMART_PRE_FETCH, 2},
@@ -5368,11 +5368,11 @@ static const struct ipa_ep_configuration ipa3_ep_mapping
 
 	/*For test purposes only*/
 	[IPA_5_5][IPA_CLIENT_TEST_PROD] = {
-			true, IPA_v5_5_GROUP_UL,
+			true, IPA_v5_5_GROUP_URLLC,
 			true,
-			IPA_DPS_HPS_SEQ_TYPE_PKT_PROCESS_NO_DEC_NO_UCP,
+			IPA_DPS_HPS_SEQ_TYPE_2ND_PKT_PROCESS_PASS_NO_DEC_UCP,
 			QMB_MASTER_SELECT_DDR,
-			{ 0, 15, 8, 16, IPA_EE_AP, GSI_SMART_PRE_FETCH, 3 },
+			{ 4, 9, 8, 16, IPA_EE_AP, GSI_SMART_PRE_FETCH, 3 },
 			IPA_TX_INSTANCE_NA },
 
 	[IPA_5_5][IPA_CLIENT_TEST1_PROD] = {
@@ -6688,8 +6688,13 @@ const char *ipa_get_version_string(enum ipa_hw_type ver)
 		break;
 	case IPA_HW_v5_1:
 		str = "5.1";
+		fallthrough;
+	case IPA_HW_v5_2:
+		str = "5.2";
+		fallthrough;
 	case IPA_HW_v5_5:
 		str = "5.5";
+		fallthrough;
 	default:
 		str = "Invalid version";
 		break;
@@ -9365,13 +9370,11 @@ int ipa3_write_qmap_id(struct ipa_ioc_write_qmapid *param_in)
 		param_in->client == IPA_CLIENT_RTK_ETHERNET_PROD) {
 		result = ipa3_cfg_ep_metadata(ipa_ep_idx, &meta);
 	} else if (param_in->client == IPA_CLIENT_WLAN1_PROD ||
-			   param_in->client == IPA_CLIENT_WLAN2_PROD ||
-				param_in->client == IPA_CLIENT_WLAN3_PROD) {
+			   param_in->client == IPA_CLIENT_WLAN2_PROD) {
 		ipa3_ctx->ep[ipa_ep_idx].cfg.meta = meta;
-		if (param_in->client == IPA_CLIENT_WLAN2_PROD ||
-			param_in->client == IPA_CLIENT_WLAN3_PROD)
-				result = ipa3_write_qmapid_wdi3_gsi_pipe(
-					ipa_ep_idx, meta.qmap_id);
+		if (param_in->client == IPA_CLIENT_WLAN2_PROD)
+			result = ipa3_write_qmapid_wdi3_gsi_pipe(
+				ipa_ep_idx, meta.qmap_id);
 		else
 			result = ipa3_write_qmapid_wdi_pipe(
 				ipa_ep_idx, meta.qmap_id);
@@ -11074,12 +11077,14 @@ static void ipa3_write_rsrc_grp_type_reg(int group_index,
 		if (src) {
 			switch (group_index) {
 			case IPA_v4_0_GROUP_LWA_DL:
+				fallthrough;
 			case IPA_v4_0_GROUP_UL_DL:
 				ipahal_write_reg_n_fields(
 					IPA_SRC_RSRC_GRP_01_RSRC_TYPE_n,
 					n, val);
 				break;
 			case IPA_v4_0_MHI_GROUP_DMA:
+				fallthrough;
 			case IPA_v4_0_GROUP_UC_RX_Q:
 				ipahal_write_reg_n_fields(
 					IPA_SRC_RSRC_GRP_23_RSRC_TYPE_n,
@@ -11094,6 +11099,7 @@ static void ipa3_write_rsrc_grp_type_reg(int group_index,
 		} else {
 			switch (group_index) {
 			case IPA_v4_0_GROUP_LWA_DL:
+				fallthrough;
 			case IPA_v4_0_GROUP_UL_DL:
 				ipahal_write_reg_n_fields(
 					IPA_DST_RSRC_GRP_01_RSRC_TYPE_n,
@@ -11238,7 +11244,7 @@ static void ipa3_write_rsrc_grp_type_reg(int group_index,
 				break;
 			case IPA_v4_9_GROUP_UC_RX:
 				ipahal_write_reg_n_fields(
-					IPA_DST_RSRC_GRP_23_RSRC_TYPE_n,
+					IPA_SRC_RSRC_GRP_23_RSRC_TYPE_n,
 					n, val);
 				break;
 			default:
@@ -13321,6 +13327,7 @@ void ipa3_eth_get_status(u32 client, int scratch_id,
 	case IPA_CLIENT_RTK_ETHERNET_PROD:
 		stats->err = gsi_get_drop_stats(ipa_ep_idx, RTK_GSI_SCRATCH_ID,
 			ch_id);
+		fallthrough;
 	case IPA_CLIENT_RTK_ETHERNET_CONS:
 		stats->wp = gsi_get_refetch_reg(ch_id, false);
 		stats->rp = gsi_get_refetch_reg(ch_id, true);
