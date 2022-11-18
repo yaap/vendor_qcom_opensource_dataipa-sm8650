@@ -129,6 +129,8 @@ struct ipa3_rmnet_plat_drv_res {
 	u32 wan_rx_desc_size;
 };
 
+
+
 /**
  * struct ipa3_wwan_private - WWAN private data
  * @net: network interface struct implemented by this driver
@@ -1631,7 +1633,7 @@ static void apps_ipa_packet_receive_notify(void *priv,
 
 	if (evt == IPA_RECEIVE) {
 		struct sk_buff *skb = (struct sk_buff *)data;
-		int result;
+		int result = 0;
 		unsigned int packet_len = skb->len;
 
 		IPAWANDBG_LOW("Rx packet was received");
@@ -1647,9 +1649,11 @@ static void apps_ipa_packet_receive_notify(void *priv,
 		} else {
 			if (dev->stats.rx_packets % IPA_WWAN_RX_SOFTIRQ_THRESH
 					== 0) {
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
 				trace_rmnet_ipa_netifni3(dev->stats.rx_packets);
 				result = netif_rx_ni(skb);
 			} else {
+#endif
 				trace_rmnet_ipa_netifrx3(dev->stats.rx_packets);
 				result = netif_rx(skb);
 			}
@@ -3752,7 +3756,7 @@ static int ipa3_wwan_remove(struct platform_device *pdev)
 	mutex_unlock(&rmnet_ipa3_ctx->pipe_handle_guard);
 	/* Clean up netdev resources in BEFORE_SHUTDOWN for non remoteproc
 	 * targets. */
-#if !IS_ENABLED(CONFIG_QCOM_Q6V5_PAS)
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	IPAWANINFO("rmnet_ipa unregister_netdev\n");
 	if (IPA_NETDEV())
 		unregister_netdev(IPA_NETDEV());
@@ -3760,7 +3764,7 @@ static int ipa3_wwan_remove(struct platform_device *pdev)
 #endif
 	cancel_work_sync(&ipa3_tx_wakequeue_work);
 	cancel_delayed_work(&ipa_tether_stats_poll_wakequeue_work);
-#if !IS_ENABLED(CONFIG_QCOM_Q6V5_PAS)
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	if (IPA_NETDEV())
 		free_netdev(IPA_NETDEV());
 	rmnet_ipa3_ctx->wwan_priv = NULL;
@@ -3952,7 +3956,7 @@ static int ipa3_lcl_mdm_ssr_notifier_cb(struct notifier_block *this,
 #if IS_ENABLED(CONFIG_DEEPSLEEP)
 	case SUBSYS_BEFORE_DS_ENTRY:
 #endif
-#if IS_ENABLED(CONFIG_QCOM_Q6V5_PAS)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
 	case QCOM_SSR_BEFORE_SHUTDOWN:
 #else
 	case SUBSYS_BEFORE_SHUTDOWN:
@@ -3989,7 +3993,7 @@ static int ipa3_lcl_mdm_ssr_notifier_cb(struct notifier_block *this,
 		break;
 #endif
 
-#if IS_ENABLED(CONFIG_QCOM_Q6V5_PAS)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
 	case QCOM_SSR_AFTER_SHUTDOWN:
 #else
 	case SUBSYS_AFTER_SHUTDOWN:
@@ -3997,7 +4001,7 @@ static int ipa3_lcl_mdm_ssr_notifier_cb(struct notifier_block *this,
 		IPAWANINFO("IPA Received MPSS AFTER_SHUTDOWN\n");
 		/* Clean up netdev resources in AFTER_SHUTDOWN for remoteproc
 		 * enabled targets. */
-#if IS_ENABLED(CONFIG_QCOM_Q6V5_PAS)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
 		IPAWANINFO("rmnet_ipa unregister_netdev\n");
 		if (IPA_NETDEV())
 			unregister_netdev(IPA_NETDEV());
@@ -4029,7 +4033,7 @@ static int ipa3_lcl_mdm_ssr_notifier_cb(struct notifier_block *this,
 		break;
 #endif
 
-#if IS_ENABLED(CONFIG_QCOM_Q6V5_PAS)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
 	case QCOM_SSR_BEFORE_POWERUP:
 #else
 	case SUBSYS_BEFORE_POWERUP:
@@ -4048,7 +4052,7 @@ static int ipa3_lcl_mdm_ssr_notifier_cb(struct notifier_block *this,
 #if IS_ENABLED(CONFIG_DEEPSLEEP)
 	case SUBSYS_AFTER_DS_EXIT:
 #endif
-#if IS_ENABLED(CONFIG_QCOM_Q6V5_PAS)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
 	case QCOM_SSR_AFTER_POWERUP:
 #else
 	case SUBSYS_AFTER_POWERUP:
@@ -4086,28 +4090,28 @@ static int ipa3_rmt_mdm_ssr_notifier_cb(struct notifier_block *this,
 	}
 
 	switch (code) {
-#if IS_ENABLED(CONFIG_QCOM_Q6V5_PAS)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
 	case QCOM_SSR_BEFORE_SHUTDOWN:
 #else
 	case SUBSYS_BEFORE_SHUTDOWN:
 #endif
 		IPAWANINFO("IPA received RMT MPSS BEFORE_SHUTDOWN\n");
 		break;
-#if IS_ENABLED(CONFIG_QCOM_Q6V5_PAS)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
 	case QCOM_SSR_AFTER_SHUTDOWN:
 #else
 	case SUBSYS_AFTER_SHUTDOWN:
 #endif
 		IPAWANINFO("IPA Received RMT MPSS AFTER_SHUTDOWN\n");
 		break;
-#if IS_ENABLED(CONFIG_QCOM_Q6V5_PAS)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
 	case QCOM_SSR_BEFORE_POWERUP:
 #else
 	case SUBSYS_BEFORE_POWERUP:
 #endif
 		IPAWANINFO("IPA received RMT MPSS BEFORE_POWERUP\n");
 		break;
-#if IS_ENABLED(CONFIG_QCOM_Q6V5_PAS)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
 	case QCOM_SSR_AFTER_POWERUP:
 #else
 	case SUBSYS_AFTER_POWERUP:
@@ -6629,7 +6633,7 @@ int ipa3_wwan_init(void)
 	rmnet_ipa_debugfs_init();
 
 	/* Register for Local Modem SSR */
-#if IS_ENABLED(CONFIG_QCOM_Q6V5_PAS)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
 	ssr_hdl = qcom_register_ssr_notifier(SUBSYS_LOCAL_MODEM,
 		&ipa3_lcl_mdm_ssr_notifier);
 #else
@@ -6646,7 +6650,7 @@ int ipa3_wwan_init(void)
 
 	if (rmnet_ipa3_ctx->ipa_config_is_apq) {
 		/* Register for Remote Modem SSR */
-	#if IS_ENABLED(CONFIG_QCOM_Q6V5_PAS)
+	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
 		ssr_hdl = qcom_register_ssr_notifier(SUBSYS_REMOTE_MODEM,
 			&ipa3_rmt_mdm_ssr_notifier);
 	#else
@@ -6668,7 +6672,7 @@ int ipa3_wwan_init(void)
 
 fail_unreg_lcl_mdm_ssr:
 	if (rmnet_ipa3_ctx->lcl_mdm_subsys_notify_handle) {
-#if IS_ENABLED(CONFIG_QCOM_Q6V5_PAS)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
 		qcom_unregister_ssr_notifier(
 			rmnet_ipa3_ctx->lcl_mdm_subsys_notify_handle,
 			&ipa3_lcl_mdm_ssr_notifier);
@@ -6690,7 +6694,7 @@ void ipa3_wwan_cleanup(void)
 
 	platform_driver_unregister(&rmnet_ipa_driver);
 	if (rmnet_ipa3_ctx->lcl_mdm_subsys_notify_handle) {
-#if IS_ENABLED(CONFIG_QCOM_Q6V5_PAS)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
 		ret = qcom_unregister_ssr_notifier(
 			rmnet_ipa3_ctx->lcl_mdm_subsys_notify_handle,
 			&ipa3_lcl_mdm_ssr_notifier);
@@ -6705,7 +6709,7 @@ void ipa3_wwan_cleanup(void)
 			SUBSYS_LOCAL_MODEM, ret);
 	}
 	if (rmnet_ipa3_ctx->rmt_mdm_subsys_notify_handle) {
-#if IS_ENABLED(CONFIG_QCOM_Q6V5_PAS)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
 		ret = qcom_unregister_ssr_notifier(
 			rmnet_ipa3_ctx->rmt_mdm_subsys_notify_handle,
 			&ipa3_rmt_mdm_ssr_notifier);

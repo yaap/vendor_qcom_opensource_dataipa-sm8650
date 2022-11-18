@@ -1,5 +1,6 @@
 ifneq ($(TARGET_BOARD_PLATFORM),qssi)
-GSI_DLKM_PLATFORMS_LIST := taro kalama bengal monaco
+
+GSI_DLKM_PLATFORMS_LIST := taro kalama bengal monaco pineapple
 
 ifeq ($(call is-board-platform-in-list, $(GSI_DLKM_PLATFORMS_LIST)),true)
 #Make file to create GSI DLKM

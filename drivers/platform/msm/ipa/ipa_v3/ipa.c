@@ -523,7 +523,7 @@ static int ipa_pm_notify(struct notifier_block *b, unsigned long event, void *p)
 	switch (event) {
 		case PM_POST_SUSPEND:
 #ifdef CONFIG_DEEPSLEEP
-			if (pm_suspend_via_firmware() && ipa3_ctx->deepsleep) {
+			if (mem_sleep_current == PM_SUSPEND_MEM && ipa3_ctx->deepsleep) {
 				IPADBG("Enter deepsleep resume\n");
 				ipa3_deepsleep_resume();
 				IPADBG("Exit deepsleep resume\n");
@@ -995,7 +995,6 @@ struct ipa_smmu_cb_ctx *ipa3_get_smmu_ctx(enum ipa_smmu_cb_type cb_type)
 {
 	return &smmu_cb[cb_type];
 }
-EXPORT_SYMBOL(ipa3_get_smmu_ctx);
 
 static int ipa3_open(struct inode *inode, struct file *filp)
 {
@@ -8464,13 +8463,13 @@ static int ipa3_pil_load_ipa_fws(const char *sub_sys)
 
 	IPADBG("PIL FW loading process initiated sub_sys=%s\n",
 		sub_sys);
-
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 14, 0))
 	ipa3_ctx->subsystem_get_retval = subsystem_get(sub_sys);
 	if (IS_ERR_OR_NULL(ipa3_ctx->subsystem_get_retval)) {
 		IPAERR("Unable to PIL load FW for sub_sys=%s\n", sub_sys);
 		return -EINVAL;
 	}
-
+#endif
 	IPADBG("PIL FW loading process is complete sub_sys=%s\n", sub_sys);
 	return 0;
 }
@@ -10185,7 +10184,7 @@ static void ipa_dts_get_ulso_data(struct platform_device *pdev,
 static int get_ipa_dts_configuration(struct platform_device *pdev,
 		struct ipa3_plat_drv_res *ipa_drv_res)
 {
-	int i, result, pos;
+	int i, result, pos, irq = 0;
 	struct resource *resource;
 	u32 *ipa_tz_unlock_reg;
 	int elem_num;
@@ -10596,6 +10595,7 @@ static int get_ipa_dts_configuration(struct platform_device *pdev,
 			ipa_drv_res->transport_mem_size);
 
 	/* Get IPA GSI IRQ number */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
 	resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
 			"gsi-irq");
 	if (!resource) {
@@ -10603,6 +10603,14 @@ static int get_ipa_dts_configuration(struct platform_device *pdev,
 		return -ENODEV;
 	}
 	ipa_drv_res->transport_irq = resource->start;
+#else
+	irq = platform_get_irq_byname(pdev, "gsi-irq");
+	if (irq < 0) {
+		IPAERR(":get resource failed for gsi-irq\n");
+		return -ENODEV;
+	}
+	ipa_drv_res->transport_irq = irq;
+#endif
 	IPADBG(": gsi-irq = %d\n", ipa_drv_res->transport_irq);
 
 	/* Get IPA pipe mem start ofst */
@@ -10619,6 +10627,7 @@ static int get_ipa_dts_configuration(struct platform_device *pdev,
 	}
 
 	/* Get IPA IRQ number */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
 	resource = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
 			"ipa-irq");
 	if (!resource) {
@@ -10626,6 +10635,14 @@ static int get_ipa_dts_configuration(struct platform_device *pdev,
 		return -ENODEV;
 	}
 	ipa_drv_res->ipa_irq = resource->start;
+#else
+	irq = platform_get_irq_byname(pdev, "ipa-irq");
+	if (irq < 0) {
+		IPAERR(":get resource failed for ipa-irq\n");
+		return -ENODEV;
+	}
+	ipa_drv_res->ipa_irq = irq;
+#endif
 	IPADBG(":ipa-irq = %d\n", ipa_drv_res->ipa_irq);
 
 	result = of_property_read_u32(pdev->dev.of_node, "qcom,ee",
@@ -11796,7 +11813,7 @@ int ipa3_ap_suspend(struct device *dev)
 	}
 
 #ifdef CONFIG_DEEPSLEEP
-	if (pm_suspend_via_firmware()) {
+	if (mem_sleep_current == PM_SUSPEND_MEM) {
 		IPADBG("Enter deepsleep suspend\n");
 		ipa3_deepsleep_suspend();
 		IPADBG("Exit deepsleep suspend\n");
@@ -11992,7 +12009,6 @@ int ipa3_iommu_map(struct iommu_domain *domain,
 
 	return iommu_map(domain, iova, paddr, size, prot);
 }
-EXPORT_SYMBOL(ipa3_iommu_map);
 
 /**
  * ipa_get_smmu_params()- Return the ipa3 smmu related params.
