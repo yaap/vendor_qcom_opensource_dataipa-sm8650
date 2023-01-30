@@ -2,7 +2,7 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _IPA3_I_H_
@@ -2122,6 +2122,11 @@ struct ipa_minidump_data {
 };
 #endif
 
+struct ipa_notifier_block_data {
+	struct list_head entry;
+	struct notifier_block ipa_rmnet_notifier;
+};
+
 /* Peripheral stats for Q6, should be in the same order, defined by Q6 */
 enum ipa_per_stats_type_e {
 	IPA_PER_STATS_TYPE_NUM_PERS,
@@ -2564,7 +2569,7 @@ struct ipa3_context {
 	u64 gsi_msi_addr;
 	spinlock_t notifier_lock;
 	struct raw_notifier_head *ipa_rmnet_notifier_list_internal;
-	struct notifier_block ipa_rmnet_notifier;
+	struct list_head notifier_block_list_head;
 	bool ipa_rmnet_notifier_enabled;
 	bool buff_above_thresh_for_def_pipe_notified;
 	bool buff_above_thresh_for_coal_pipe_notified;
