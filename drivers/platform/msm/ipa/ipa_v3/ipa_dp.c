@@ -3,7 +3,7 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/ip.h>
 #include <linux/ipv6.h>
@@ -2865,21 +2865,22 @@ static struct ipa3_rx_pkt_wrapper * ipa3_get_free_page
 
 int ipa_register_notifier(void *fn_ptr)
 {
+	struct ipa_notifier_block_data *ipa_notifier_block;
 	if (fn_ptr == NULL)
 		return -EFAULT;
 	spin_lock(&ipa3_ctx->notifier_lock);
-	atomic_set(&ipa3_ctx->stats.num_buff_above_thresh_for_def_pipe_notified, 0);
-	atomic_set(&ipa3_ctx->stats.num_buff_above_thresh_for_coal_pipe_notified, 0);
-	atomic_set(&ipa3_ctx->stats.num_buff_below_thresh_for_def_pipe_notified, 0);
-	atomic_set(&ipa3_ctx->stats.num_buff_below_thresh_for_coal_pipe_notified, 0);
-	ipa3_ctx->ipa_rmnet_notifier.notifier_call = fn_ptr;
-	if (!ipa3_ctx->ipa_rmnet_notifier_enabled)
-		raw_notifier_chain_register(ipa3_ctx->ipa_rmnet_notifier_list_internal,
-			&ipa3_ctx->ipa_rmnet_notifier);
-	else {
-		IPAWANERR("rcvd notifier reg again, changing the cb function\n");
-		ipa3_ctx->ipa_rmnet_notifier.notifier_call = fn_ptr;
+	ipa_notifier_block = (struct ipa_notifier_block_data *)kzalloc(sizeof(struct ipa_notifier_block_data), GFP_KERNEL);
+	if (ipa_notifier_block == NULL) {
+		IPAWANERR("Buffer threshold notifier failure\n");
+		spin_unlock(&ipa3_ctx->notifier_lock);
+		return -EFAULT;
 	}
+	ipa_notifier_block->ipa_rmnet_notifier.notifier_call = fn_ptr;
+	list_add(&ipa_notifier_block->entry, &ipa3_ctx->notifier_block_list_head);
+	raw_notifier_chain_register(ipa3_ctx->ipa_rmnet_notifier_list_internal,
+		&ipa_notifier_block->ipa_rmnet_notifier);
+	IPAWANERR("Registered noifier for buffer threshold\n");
+
 	ipa3_ctx->ipa_rmnet_notifier_enabled = true;
 	spin_unlock(&ipa3_ctx->notifier_lock);
 	return 0;
@@ -2888,16 +2889,24 @@ EXPORT_SYMBOL(ipa_register_notifier);
 
 int ipa_unregister_notifier(void *fn_ptr)
 {
+	struct ipa_notifier_block_data *ipa_notifier_block, *temp;
 	if (fn_ptr == NULL)
 		return -EFAULT;
 	spin_lock(&ipa3_ctx->notifier_lock);
-	ipa3_ctx->ipa_rmnet_notifier.notifier_call = fn_ptr;
-	if (ipa3_ctx->ipa_rmnet_notifier_enabled)
-		raw_notifier_chain_unregister(ipa3_ctx->ipa_rmnet_notifier_list_internal,
-			&ipa3_ctx->ipa_rmnet_notifier);
-	else IPAWANERR("rcvd notifier unreg again\n");
-	ipa3_ctx->ipa_rmnet_notifier_enabled = false;
+	/* Find the client pointer, unregister and remove from the list */
+	list_for_each_entry_safe(ipa_notifier_block, temp, &ipa3_ctx->notifier_block_list_head, entry) {
+		if (ipa_notifier_block->ipa_rmnet_notifier.notifier_call == fn_ptr) {
+			raw_notifier_chain_unregister(ipa3_ctx->ipa_rmnet_notifier_list_internal,
+					&ipa_notifier_block->ipa_rmnet_notifier);
+			list_del(&ipa_notifier_block->entry);
+			kfree(ipa_notifier_block);
+			IPAWANERR("Client removed from list and unregistered succesfully\n");
+			spin_unlock(&ipa3_ctx->notifier_lock);
+			return 0;
+		}
+	}
 	spin_unlock(&ipa3_ctx->notifier_lock);
+	IPAWANERR("Unable to find the client in the list\n");
 	return 0;
 }
 EXPORT_SYMBOL(ipa_unregister_notifier);
