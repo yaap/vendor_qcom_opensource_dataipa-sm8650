@@ -1399,7 +1399,9 @@ static int __gsi_request_msi_irq(unsigned long msi)
 static int __gsi_allocate_msis(void)
 {
 	int result = 0;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
 	struct msi_desc *desc = NULL;
+#endif
 	size_t size = 0;
 
 	/* Allocate all MSIs */
@@ -1419,7 +1421,6 @@ static int __gsi_allocate_msis(void)
 	for (unsigned long msi = 0; msi < gsi_ctx->msi.num; msi++) {
 		/* Save IRQ */
 		gsi_ctx->msi.irq[msi] = msi_get_virq(gsi_ctx->dev, msi);
-		GSIDBG("desc->irq =%d\n", desc->irq);
 #else
 	for_each_msi_entry(desc, gsi_ctx->dev) {
 		unsigned long msi = desc->platform.msi_index;
