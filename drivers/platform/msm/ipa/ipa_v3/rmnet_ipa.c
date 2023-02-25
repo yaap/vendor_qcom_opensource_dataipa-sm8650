@@ -3969,6 +3969,8 @@ static int ipa3_lcl_mdm_ssr_notifier_cb(struct notifier_block *this,
 	case SUBSYS_BEFORE_SHUTDOWN:
 #endif
 		IPAWANINFO("IPA received MPSS BEFORE_SHUTDOWN\n");
+		/* hold a proxy vote for the modem. */
+		ipa3_proxy_clk_vote(atomic_read(&rmnet_ipa3_ctx->is_ssr));
 		/* send SSR before-shutdown notification to IPACM */
 		ipa3_set_modem_up(false);
 		rmnet_ipa_send_ssr_notification(false);
@@ -4006,6 +4008,7 @@ static int ipa3_lcl_mdm_ssr_notifier_cb(struct notifier_block *this,
 	case SUBSYS_AFTER_SHUTDOWN:
 #endif
 		IPAWANINFO("IPA Received MPSS AFTER_SHUTDOWN\n");
+		ipa3_proxy_clk_unvote();
 		/* Clean up netdev resources in AFTER_SHUTDOWN for remoteproc
 		 * enabled targets. */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
