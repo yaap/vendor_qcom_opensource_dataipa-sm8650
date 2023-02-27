@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
+ *
+ * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "ipa_i.h"
@@ -2008,6 +2010,72 @@ void ipa3_delete_dflt_flt_rules(u32 ipa_ep_idx)
 		/* Reset the sticky flag. */
 		tbl->sticky_rear = false;
 		ep->dflt_flt6_rule_hdl = 0;
+	}
+	mutex_unlock(&ipa3_ctx->lock);
+}
+
+void ipa3_install_dl_opt_wdi_dpath_flt_rules(u32 ipa_ep_idx, u32 rt_tbl_idx)
+{
+	struct ipa3_flt_tbl *tbl;
+	struct ipa3_ep_context *ep;
+	struct ipa_flt_rule_i rule;
+
+	if (ipa_ep_idx >= ipa3_get_max_num_pipes()) {
+		IPAERR("invalid ipa_ep_idx=%u\n", ipa_ep_idx);
+		ipa_assert();
+		return;
+	}
+
+	ep = &ipa3_ctx->ep[ipa_ep_idx];
+
+	if (!ipa_is_ep_support_flt(ipa_ep_idx)) {
+		IPADBG("cannot add flt rules to non filtering pipe num %d\n",
+			ipa_ep_idx);
+		return;
+	}
+
+	memset(&rule, 0, sizeof(rule));
+
+	mutex_lock(&ipa3_ctx->lock);
+	tbl = &ipa3_ctx->flt_tbl[ipa_ep_idx][IPA_IP_v4];
+	rule.eq_attrib_type = true;
+	rule.eq_attrib.rule_eq_bitmap = 1 << 5;
+	rule.eq_attrib.num_offset_meq_32 = 1;
+	rule.action = IPA_PASS_TO_ROUTING;
+	rule.rt_tbl_idx = rt_tbl_idx;
+	__ipa_add_flt_rule(tbl, IPA_IP_v4, &rule, false,
+			&ep->dl_flt4_rule_hdl, false);
+	ipa3_ctx->ctrl->ipa3_commit_flt(IPA_IP_v4);
+
+	tbl = &ipa3_ctx->flt_tbl[ipa_ep_idx][IPA_IP_v6];
+	rule.eq_attrib_type = true;
+	rule.eq_attrib.rule_eq_bitmap = 1 << 5;
+	rule.eq_attrib.num_offset_meq_32 = 1;
+	rule.action = IPA_PASS_TO_ROUTING;
+	rule.rt_tbl_idx = rt_tbl_idx;
+	__ipa_add_flt_rule(tbl, IPA_IP_v6, &rule, false,
+			&ep->dl_flt6_rule_hdl, false);
+	ipa3_ctx->ctrl->ipa3_commit_flt(IPA_IP_v6);
+	mutex_unlock(&ipa3_ctx->lock);
+}
+
+void ipa3_delete_dl_opt_wdi_dpath_flt_rules(u32 ipa_ep_idx)
+{
+	struct ipa3_ep_context *ep = &ipa3_ctx->ep[ipa_ep_idx];
+	struct ipa3_flt_tbl *tbl;
+
+	mutex_lock(&ipa3_ctx->lock);
+	if (ep->dl_flt4_rule_hdl) {
+		tbl = &ipa3_ctx->flt_tbl[ipa_ep_idx][IPA_IP_v4];
+		__ipa_del_flt_rule(ep->dl_flt4_rule_hdl);
+		ipa3_ctx->ctrl->ipa3_commit_flt(IPA_IP_v4);
+		ep->dl_flt4_rule_hdl = 0;
+	}
+	if (ep->dl_flt6_rule_hdl) {
+		tbl = &ipa3_ctx->flt_tbl[ipa_ep_idx][IPA_IP_v6];
+		__ipa_del_flt_rule(ep->dl_flt6_rule_hdl);
+		ipa3_ctx->ctrl->ipa3_commit_flt(IPA_IP_v6);
+		ep->dl_flt6_rule_hdl = 0;
 	}
 	mutex_unlock(&ipa3_ctx->lock);
 }

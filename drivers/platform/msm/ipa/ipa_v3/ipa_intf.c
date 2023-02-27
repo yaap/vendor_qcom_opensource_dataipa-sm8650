@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2013-2019, The Linux Foundation. All rights reserved.
+ *
+ * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/fs.h>
@@ -513,6 +515,12 @@ int ipa_send_msg(struct ipa_msg_meta *meta, void *buff,
 	if (meta->msg_type >= IPA_EVENT_MAX_NUM) {
 		IPAERR_RL("unsupported message type %d\n", meta->msg_type);
 		return -EINVAL;
+	}
+
+	if (ipa3_ctx->ipa_wdi_opt_dpath && WLAN_IPA_EVENT(meta->msg_type)) {
+		IPAERR_RL("Opt data path enabled, ignore message type %d\n",
+			meta->msg_type);
+		return 0;
 	}
 
 	msg = kzalloc(sizeof(struct ipa3_push_msg), GFP_KERNEL);

@@ -140,6 +140,14 @@ enum {
 #define IPA_WDI2_OVER_GSI() (ipa3_ctx->ipa_wdi2_over_gsi \
 		&& (ipa_get_wdi_version() == IPA_WDI_2))
 
+#define WLAN_IPA_EVENT(m) (m == WLAN_STA_CONNECT || \
+		m == WLAN_AP_CONNECT || \
+		m == WLAN_CLIENT_CONNECT_EX || \
+		m == WLAN_CLIENT_CONNECT || \
+		m == WLAN_STA_DISCONNECT || \
+		m == WLAN_AP_DISCONNECT || \
+		m == WLAN_CLIENT_DISCONNECT)
+
 #define IPADBG(fmt, args...) \
 	do { \
 		pr_debug(DRV_NAME " %s:%d " fmt, __func__, __LINE__, ## args);\
@@ -1104,6 +1112,8 @@ struct ipa3_ep_context {
 	atomic_t avail_fifo_desc;
 	u32 dflt_flt4_rule_hdl;
 	u32 dflt_flt6_rule_hdl;
+	u32 dl_flt4_rule_hdl;
+	u32 dl_flt6_rule_hdl;
 	bool skip_ep_cfg;
 	bool keep_ipa_awake;
 	struct ipa3_wlan_stats wstats;
@@ -2412,6 +2422,7 @@ struct ipa3_context {
 	bool ipa_config_is_auto;
 	bool ipa_wdi2_over_gsi;
 	bool ipa_wdi3_over_gsi;
+	bool ipa_wdi_opt_dpath;
 	bool ipa_endp_delay_wa;
 	bool lan_coal_enable;
 	bool ipa_fltrt_not_hashable;
@@ -2687,6 +2698,7 @@ struct ipa3_plat_drv_res {
 	bool use_pm_wrapper;
 	bool use_tput_est_ep;
 	bool ulso_wa;
+	bool ipa_wdi_opt_dpath;
 	u8 coal_ipv4_id_ignore;
 };
 
@@ -3387,6 +3399,8 @@ int __ipa_commit_hdr_v3_0(void);
 void ipa3_skb_recycle(struct sk_buff *skb);
 void ipa3_install_dflt_flt_rules(u32 ipa_ep_idx);
 void ipa3_delete_dflt_flt_rules(u32 ipa_ep_idx);
+void ipa3_install_dl_opt_wdi_dpath_flt_rules(u32 ipa_ep_idx, u32 rt_tbl_idx);
+void ipa3_delete_dl_opt_wdi_dpath_flt_rules(u32 ipa_ep_idx);
 
 int ipa3_remove_secondary_flow_ctrl(int gsi_chan_hdl);
 int ipa3_enable_data_path(u32 clnt_hdl);
