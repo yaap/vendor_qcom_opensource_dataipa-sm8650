@@ -520,6 +520,8 @@ int ipa_send_msg(struct ipa_msg_meta *meta, void *buff,
 	if (ipa3_ctx->ipa_wdi_opt_dpath && WLAN_IPA_EVENT(meta->msg_type)) {
 		IPAERR_RL("Opt data path enabled, ignore message type %d\n",
 			meta->msg_type);
+		if (buff)
+			callback(buff, meta->msg_len, meta->msg_type);
 		return 0;
 	}
 
