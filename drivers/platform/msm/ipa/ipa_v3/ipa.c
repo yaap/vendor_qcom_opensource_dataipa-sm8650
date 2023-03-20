@@ -791,38 +791,21 @@ int ipa3_active_clients_log_print_table(char *buf, int size)
 
 static int ipa3_clean_modem_rule(void)
 {
-	struct ipa_install_fltr_rule_req_msg_v01 *req;
 	struct ipa_install_fltr_rule_req_ex_msg_v01 *req_ex;
 	int val = 0;
 
-	if (ipa3_ctx->ipa_hw_type < IPA_HW_v3_0) {
-		req = kzalloc(
-			sizeof(struct ipa_install_fltr_rule_req_msg_v01),
-			GFP_KERNEL);
-		if (!req) {
-			IPAERR("mem allocated failed!\n");
-			return -ENOMEM;
-		}
-		req->filter_spec_list_valid = false;
-		req->filter_spec_list_len = 0;
-		req->source_pipe_index_valid = 0;
-		val = ipa3_qmi_filter_request_send(req);
-		kfree(req);
-	} else {
-		req_ex = kzalloc(
-			sizeof(struct ipa_install_fltr_rule_req_ex_msg_v01),
-			GFP_KERNEL);
-		if (!req_ex) {
-			IPAERR("mem allocated failed!\n");
-			return -ENOMEM;
-		}
-		req_ex->filter_spec_ex_list_valid = false;
-		req_ex->filter_spec_ex_list_len = 0;
-		req_ex->source_pipe_index_valid = 0;
-		val = ipa3_qmi_filter_request_ex_send(req_ex);
-		kfree(req_ex);
+	req_ex = kzalloc(
+		sizeof(struct ipa_install_fltr_rule_req_ex_msg_v01),
+		GFP_KERNEL);
+	if (!req_ex) {
+		IPAERR("mem allocated failed!\n");
+		return -ENOMEM;
 	}
-
+	req_ex->filter_spec_ex_list_valid = false;
+	req_ex->filter_spec_ex_list_len = 0;
+	req_ex->source_pipe_index_valid = 0;
+	val = ipa3_qmi_filter_request_ex_send(req_ex);
+	kfree(req_ex);
 	return val;
 }
 
@@ -6303,7 +6286,7 @@ static int ipa3_setup_apps_pipes(void)
 
 	ipa3_ctx->clnt_hdl_data_in = 0;
 
-	if ( ipa3_ctx->ipa_hw_type >= IPA_HW_v5_5 ) {
+	if ( ipa3_ctx->ipa_hw_type >= IPA_HW_v5_5 && ipa3_ctx->lan_coal_enable) {
 		/*
 		 * LAN_COAL IN (IPA->AP)
 		 */
@@ -9112,6 +9095,15 @@ static u32 get_ipa_gen_rx_cmn_temp_pool_size(u32 rx_cmn_temp_pool_size)
         return IPA_GENERIC_RX_CMN_TEMP_POOL_SZ_FACTOR;
 }
 
+static u32 get_ipa_gen_rx_ll_pool_size(u32 rx_ll_pool_sz_factor)
+{
+        if (!rx_ll_pool_sz_factor)
+                return IPA_GENERIC_RX_PAGE_POOL_SZ_FACTOR;
+        if (rx_ll_pool_sz_factor <= IPA_GENERIC_RX_PAGE_POOL_SZ_FACTOR)
+                return rx_ll_pool_sz_factor;
+        return IPA_GENERIC_RX_PAGE_POOL_SZ_FACTOR;
+}
+
 /**
  * ipa3_pre_init() - Initialize the IPA Driver.
  * This part contains all initialization which doesn't require IPA HW, such
@@ -9262,13 +9254,16 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 	ipa3_ctx->tx_poll = resource_p->tx_poll;
 	ipa3_ctx->ipa_gpi_event_rp_ddr = resource_p->ipa_gpi_event_rp_ddr;
 	ipa3_ctx->rmnet_ctl_enable = resource_p->rmnet_ctl_enable;
+	ipa3_ctx->lan_coal_enable = resource_p->lan_coal_enable;
 	ipa3_ctx->rmnet_ll_enable = resource_p->rmnet_ll_enable;
 	ipa3_ctx->tx_wrapper_cache_max_size = get_tx_wrapper_cache_size(
 			resource_p->tx_wrapper_cache_max_size);
 	ipa3_ctx->ipa_gen_rx_cmn_page_pool_sz_factor = get_ipa_gen_rx_cmn_page_pool_size(
                         resource_p->ipa_gen_rx_cmn_page_pool_sz_factor);
-        ipa3_ctx->ipa_gen_rx_cmn_temp_pool_sz_factor = get_ipa_gen_rx_cmn_temp_pool_size(
+	ipa3_ctx->ipa_gen_rx_cmn_temp_pool_sz_factor = get_ipa_gen_rx_cmn_temp_pool_size(
                         resource_p->ipa_gen_rx_cmn_temp_pool_sz_factor);
+	ipa3_ctx->ipa_gen_rx_ll_pool_sz_factor = get_ipa_gen_rx_ll_pool_size(
+                        resource_p->ipa_gen_rx_ll_pool_sz_factor);
 	ipa3_ctx->ipa_config_is_auto = resource_p->ipa_config_is_auto;
 	ipa3_ctx->ipa_mhi_proxy = resource_p->ipa_mhi_proxy;
 	ipa3_ctx->max_num_smmu_cb = resource_p->max_num_smmu_cb;
@@ -9723,8 +9718,6 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 	}
 	IPADBG("IPA power manager initialized\n");
 
-	INIT_LIST_HEAD(&ipa3_ctx->ipa_ready_cb_list);
-
 	init_completion(&ipa3_ctx->init_completion_obj);
 	init_completion(&ipa3_ctx->uc_loaded_completion_obj);
 
@@ -10117,7 +10110,6 @@ static void get_dts_tx_wrapper_cache_size(struct platform_device *pdev,
 		ipa_drv_res->tx_wrapper_cache_max_size);
 }
 
-
 static void get_dts_ipa_gen_rx_cmn_page_pool_sz_factor(struct platform_device *pdev,
                 struct ipa3_plat_drv_res *ipa_drv_res)
 {
@@ -10134,7 +10126,6 @@ static void get_dts_ipa_gen_rx_cmn_page_pool_sz_factor(struct platform_device *p
                 ipa_drv_res->ipa_gen_rx_cmn_page_pool_sz_factor);
 }
 
-
 static void get_dts_ipa_gen_rx_cmn_temp_pool_sz_factor(struct platform_device *pdev,
                 struct ipa3_plat_drv_res *ipa_drv_res)
 {
@@ -10149,6 +10140,22 @@ static void get_dts_ipa_gen_rx_cmn_temp_pool_sz_factor(struct platform_device *p
 
         IPADBG("ipa_gen_rx_cmn_temp_pool_sz_factor is set to %d",
                 ipa_drv_res->ipa_gen_rx_cmn_temp_pool_sz_factor);
+}
+
+static void get_dts_ipa_gen_rx_ll_page_pool_sz_factor(struct platform_device *pdev,
+                struct ipa3_plat_drv_res *ipa_drv_res)
+{
+        int result;
+
+        result = of_property_read_u32 (
+                pdev->dev.of_node,
+                "qcom,ipa-gen-rx-ll-pool-sz-factor",
+                &ipa_drv_res->ipa_gen_rx_ll_pool_sz_factor);
+        if (result)
+                ipa_drv_res->ipa_gen_rx_ll_pool_sz_factor = 0;
+
+        IPADBG("ipa_gen_rx_ll_pool_sz_factor is set to %d",
+                ipa_drv_res->ipa_gen_rx_ll_pool_sz_factor);
 }
 
 static void ipa_dts_get_ulso_data(struct platform_device *pdev,
@@ -10541,6 +10548,14 @@ static int get_ipa_dts_configuration(struct platform_device *pdev,
 			ipa_drv_res->rmnet_ll_enable
 			? "True" : "False");
 	}
+	ipa_drv_res->lan_coal_enable =
+		of_property_read_bool(pdev->dev.of_node,
+		"qcom,lan-coal-enable");
+	IPADBG(": Enable lan coal = %s\n",
+		ipa_drv_res->lan_coal_enable
+		? "True" : "False");
+
+
 
 	result = of_property_read_string(pdev->dev.of_node,
 			"qcom,use-gsi-ipa-fw", &ipa_drv_res->gsi_fw_file_name);
@@ -10893,7 +10908,9 @@ static int get_ipa_dts_configuration(struct platform_device *pdev,
 
 	get_dts_ipa_gen_rx_cmn_page_pool_sz_factor(pdev, ipa_drv_res);
 
-        get_dts_ipa_gen_rx_cmn_temp_pool_sz_factor(pdev, ipa_drv_res);
+	get_dts_ipa_gen_rx_cmn_temp_pool_sz_factor(pdev, ipa_drv_res);
+
+	get_dts_ipa_gen_rx_ll_page_pool_sz_factor(pdev, ipa_drv_res);
 
 	ipa_dts_get_ulso_data(pdev, ipa_drv_res);
 
@@ -11179,6 +11196,7 @@ static int ipa_smmu_ap_cb_probe(struct device *dev)
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0))
 	int mapping_config;
 #endif
+	u32 geometry_ap_mapping[2];
 
 	IPADBG("AP CB PROBE dev=%pK\n", dev);
 
@@ -11227,6 +11245,19 @@ static int ipa_smmu_ap_cb_probe(struct device *dev)
 
 	IPADBG("AP CB PROBE dev=%pK va_start=0x%x va_size=0x%x\n",
 		   dev, cb->va_start, cb->va_size);
+	if (of_property_read_u32_array(
+			dev->of_node, "qcom,iommu-geometry",
+			geometry_ap_mapping, 2) == 0) {
+		cb->geometry_start = geometry_ap_mapping[0];
+		cb->geometry_end  = geometry_ap_mapping[1];
+	} else {
+		IPADBG("AP CB PROBE Geometry not defined using max!\n");
+		cb->geometry_start = 0;
+		cb->geometry_end = 0xF0000000;
+	}
+
+	IPADBG("AP CB PROBE dev=%pK geometry_start=0x%x geometry_end=0x%x\n",
+		   dev, cb->geometry_start, cb->geometry_end);
 
 	/*
 	 * Prior to these calls to iommu_domain_get_attr(), these
@@ -12359,6 +12390,7 @@ static int __init ipa_module_init(void)
 		return -ENOMEM;
 	}
 	mutex_init(&ipa3_ctx->lock);
+	INIT_LIST_HEAD(&ipa3_ctx->ipa_ready_cb_list);
 
 	if (running_emulation) {
 		/* Register as a PCI device driver */

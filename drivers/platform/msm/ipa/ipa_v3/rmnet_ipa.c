@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
+ *
+ * Copyright (c)2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /*
@@ -3967,13 +3969,15 @@ static int ipa3_lcl_mdm_ssr_notifier_cb(struct notifier_block *this,
 	case SUBSYS_BEFORE_SHUTDOWN:
 #endif
 		IPAWANINFO("IPA received MPSS BEFORE_SHUTDOWN\n");
+		/* hold a proxy vote for the modem. */
+		ipa3_proxy_clk_vote(atomic_read(&rmnet_ipa3_ctx->is_ssr));
 		/* send SSR before-shutdown notification to IPACM */
 		ipa3_set_modem_up(false);
 		rmnet_ipa_send_ssr_notification(false);
 		atomic_set(&rmnet_ipa3_ctx->is_ssr, 1);
 		ipa3_q6_pre_shutdown_cleanup();
 		if (IPA_NETDEV())
-			netif_stop_queue(IPA_NETDEV());
+			netif_device_detach(IPA_NETDEV());
 		ipa3_qmi_stop_workqueues();
 		ipa3_wan_ioctl_stop_qmi_messages();
 		ipa_stop_polling_stats();
@@ -4004,6 +4008,7 @@ static int ipa3_lcl_mdm_ssr_notifier_cb(struct notifier_block *this,
 	case SUBSYS_AFTER_SHUTDOWN:
 #endif
 		IPAWANINFO("IPA Received MPSS AFTER_SHUTDOWN\n");
+		ipa3_proxy_clk_unvote();
 		/* Clean up netdev resources in AFTER_SHUTDOWN for remoteproc
 		 * enabled targets. */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0))
@@ -4838,6 +4843,7 @@ static int rmnet_ipa3_query_tethering_stats_hw(
 	int rc = 0, index = 0, i = 0;
 	struct ipa_quota_stats_all *con_stats;
 	enum ipa_client_type wlan_client;
+	int ep_idx,wlan_ep_idx,usb_ep_idx;
 
 	/* qet HW-stats */
 	rc = ipa_get_teth_stats();
@@ -4877,18 +4883,29 @@ static int rmnet_ipa3_query_tethering_stats_hw(
 	else
 		wlan_client = IPA_CLIENT_WLAN1_CONS;
 
+	wlan_ep_idx = ipa_get_ep_mapping( wlan_client );
+
+	if (wlan_ep_idx == -1 || wlan_ep_idx >= ipa3_get_max_num_pipes())
+		return wlan_ep_idx ;
+
 	IPAWANDBG("wlan: v4_rx_p-b(%d,%lld) v6_rx_p-b(%d,%lld),client(%d)\n",
-	con_stats->client[wlan_client].num_ipv4_pkts,
-	con_stats->client[wlan_client].num_ipv4_bytes,
-	con_stats->client[wlan_client].num_ipv6_pkts,
-	con_stats->client[wlan_client].num_ipv6_bytes,
+	con_stats->client[wlan_ep_idx].num_ipv4_pkts,
+	con_stats->client[wlan_ep_idx].num_ipv4_bytes,
+	con_stats->client[wlan_ep_idx].num_ipv6_pkts,
+	con_stats->client[wlan_ep_idx].num_ipv6_bytes,
 	wlan_client);
 
+
+	usb_ep_idx = ipa_get_ep_mapping( IPA_CLIENT_USB_CONS );
+
+	if (usb_ep_idx == -1 || usb_ep_idx >= ipa3_get_max_num_pipes())
+		return usb_ep_idx ;
+
 	IPAWANDBG("usb: v4_rx_p(%d) b(%lld) v6_rx_p(%d) b(%lld)\n",
-	con_stats->client[IPA_CLIENT_USB_CONS].num_ipv4_pkts,
-	con_stats->client[IPA_CLIENT_USB_CONS].num_ipv4_bytes,
-	con_stats->client[IPA_CLIENT_USB_CONS].num_ipv6_pkts,
-	con_stats->client[IPA_CLIENT_USB_CONS].num_ipv6_bytes);
+	con_stats->client[usb_ep_idx].num_ipv4_pkts,
+	con_stats->client[usb_ep_idx].num_ipv4_bytes,
+	con_stats->client[usb_ep_idx].num_ipv6_pkts,
+	con_stats->client[usb_ep_idx].num_ipv6_bytes);
 
 	for (i = 0; i < MAX_WIGIG_CLIENTS; i++) {
 		enum ipa_client_type wigig_client =
@@ -4897,27 +4914,33 @@ static int rmnet_ipa3_query_tethering_stats_hw(
 		if (wigig_client > IPA_CLIENT_WIGIG4_CONS)
 			break;
 
+		ep_idx = ipa_get_ep_mapping( wigig_client );
+
+		if (ep_idx == -1 || ep_idx >= ipa3_get_max_num_pipes())
+			return ep_idx ;
+
+
 		IPAWANDBG("wigig%d: v4_rx_p(%d) b(%lld) v6_rx_p(%d) b(%lld)\n",
 			i + 1,
-			con_stats->client[wigig_client].num_ipv4_pkts,
-			con_stats->client[wigig_client].num_ipv4_bytes,
-			con_stats->client[wigig_client].num_ipv6_pkts,
-			con_stats->client[wigig_client].num_ipv6_bytes);
+			con_stats->client[ep_idx].num_ipv4_pkts,
+			con_stats->client[ep_idx].num_ipv4_bytes,
+			con_stats->client[ep_idx].num_ipv6_pkts,
+			con_stats->client[ep_idx].num_ipv6_bytes);
 	}
 
 	/* update the DL stats */
 	data->ipv4_rx_packets =
-		con_stats->client[wlan_client].num_ipv4_pkts +
-			con_stats->client[IPA_CLIENT_USB_CONS].num_ipv4_pkts;
+		con_stats->client[wlan_ep_idx].num_ipv4_pkts +
+			con_stats->client[usb_ep_idx].num_ipv4_pkts;
 	data->ipv6_rx_packets =
-		con_stats->client[wlan_client].num_ipv6_pkts +
-			con_stats->client[IPA_CLIENT_USB_CONS].num_ipv6_pkts;
+		con_stats->client[wlan_ep_idx].num_ipv6_pkts +
+			con_stats->client[usb_ep_idx].num_ipv6_pkts;
 	data->ipv4_rx_bytes =
-		con_stats->client[wlan_client].num_ipv4_bytes +
-			con_stats->client[IPA_CLIENT_USB_CONS].num_ipv4_bytes;
+		con_stats->client[wlan_ep_idx].num_ipv4_bytes +
+			con_stats->client[usb_ep_idx].num_ipv4_bytes;
 	data->ipv6_rx_bytes =
-		con_stats->client[wlan_client].num_ipv6_bytes +
-			con_stats->client[IPA_CLIENT_USB_CONS].num_ipv6_bytes;
+		con_stats->client[wlan_ep_idx].num_ipv6_bytes +
+			con_stats->client[usb_ep_idx].num_ipv6_bytes;
 
 	for (i = 0; i < MAX_WIGIG_CLIENTS; i++) {
 		enum ipa_client_type wigig_client =
@@ -4926,14 +4949,19 @@ static int rmnet_ipa3_query_tethering_stats_hw(
 		if (wigig_client > IPA_CLIENT_WIGIG4_CONS)
 			break;
 
+		ep_idx = ipa_get_ep_mapping( wigig_client );
+
+		if (ep_idx == -1 || ep_idx >= ipa3_get_max_num_pipes())
+			return ep_idx ;
+
 		data->ipv4_rx_packets +=
-			con_stats->client[wigig_client].num_ipv4_pkts;
+			con_stats->client[ep_idx].num_ipv4_pkts;
 		data->ipv6_rx_packets +=
-			con_stats->client[wigig_client].num_ipv6_pkts;
+			con_stats->client[ep_idx].num_ipv6_pkts;
 		data->ipv4_rx_bytes +=
-			con_stats->client[wigig_client].num_ipv4_bytes;
+			con_stats->client[ep_idx].num_ipv4_bytes;
 		data->ipv6_rx_bytes +=
-			con_stats->client[wigig_client].num_ipv6_bytes;
+			con_stats->client[ep_idx].num_ipv6_bytes;
 	}
 
 	IPAWANDBG("v4_rx_p(%lu) v6_rx_p(%lu) v4_rx_b(%lu) v6_rx_b(%lu)\n",
@@ -4960,18 +4988,23 @@ static int rmnet_ipa3_query_tethering_stats_hw(
 	else
 		wlan_client = IPA_CLIENT_WLAN1_CONS;
 
+	wlan_ep_idx = ipa_get_ep_mapping( wlan_client );
+
+	if (wlan_ep_idx == -1 || wlan_ep_idx >= ipa3_get_max_num_pipes())
+		return wlan_ep_idx ;
+
 	IPAWANDBG("wlan: v4_rx_p-b(%d,%lld) v6_rx_p-b(%d,%lld),client(%d)\n",
-		con_stats->client[wlan_client].num_ipv4_pkts,
-		con_stats->client[wlan_client].num_ipv4_bytes,
-		con_stats->client[wlan_client].num_ipv6_pkts,
-		con_stats->client[wlan_client].num_ipv6_bytes,
+		con_stats->client[wlan_ep_idx].num_ipv4_pkts,
+		con_stats->client[wlan_ep_idx].num_ipv4_bytes,
+		con_stats->client[wlan_ep_idx].num_ipv6_pkts,
+		con_stats->client[wlan_ep_idx].num_ipv6_bytes,
 		wlan_client);
 
 	IPAWANDBG("usb: v4_rx_p(%d) b(%lld) v6_rx_p(%d) b(%lld)\n",
-		con_stats->client[IPA_CLIENT_USB_CONS].num_ipv4_pkts,
-		con_stats->client[IPA_CLIENT_USB_CONS].num_ipv4_bytes,
-		con_stats->client[IPA_CLIENT_USB_CONS].num_ipv6_pkts,
-		con_stats->client[IPA_CLIENT_USB_CONS].num_ipv6_bytes);
+		con_stats->client[usb_ep_idx].num_ipv4_pkts,
+		con_stats->client[usb_ep_idx].num_ipv4_bytes,
+		con_stats->client[usb_ep_idx].num_ipv6_pkts,
+		con_stats->client[usb_ep_idx].num_ipv6_bytes);
 
 	for (i = 0; i < MAX_WIGIG_CLIENTS; i++) {
 		enum ipa_client_type wigig_client =
@@ -4979,28 +5012,32 @@ static int rmnet_ipa3_query_tethering_stats_hw(
 
 		if (wigig_client > IPA_CLIENT_WIGIG4_CONS)
 			break;
+		ep_idx = ipa_get_ep_mapping( wigig_client );
+
+		if (ep_idx == -1 || ep_idx >= ipa3_get_max_num_pipes())
+			return ep_idx ;
 
 		IPAWANDBG("wigig%d: v4_rx_p(%d) b(%lld) v6_rx_p(%d) b(%lld)\n",
 			i + 1,
-			con_stats->client[wigig_client].num_ipv4_pkts,
-			con_stats->client[wigig_client].num_ipv4_bytes,
-			con_stats->client[wigig_client].num_ipv6_pkts,
-			con_stats->client[wigig_client].num_ipv6_bytes);
+			con_stats->client[ep_idx].num_ipv4_pkts,
+			con_stats->client[ep_idx].num_ipv4_bytes,
+			con_stats->client[ep_idx].num_ipv6_pkts,
+			con_stats->client[ep_idx].num_ipv6_bytes);
 	}
 
 	/* update the DL stats */
 	data->ipv4_rx_packets +=
-		con_stats->client[wlan_client].num_ipv4_pkts +
-			con_stats->client[IPA_CLIENT_USB_CONS].num_ipv4_pkts;
+		con_stats->client[wlan_ep_idx].num_ipv4_pkts +
+			con_stats->client[usb_ep_idx].num_ipv4_pkts;
 	data->ipv6_rx_packets +=
-		con_stats->client[wlan_client].num_ipv6_pkts +
-			con_stats->client[IPA_CLIENT_USB_CONS].num_ipv6_pkts;
+		con_stats->client[wlan_ep_idx].num_ipv6_pkts +
+			con_stats->client[usb_ep_idx].num_ipv6_pkts;
 	data->ipv4_rx_bytes +=
-		con_stats->client[wlan_client].num_ipv4_bytes +
-			con_stats->client[IPA_CLIENT_USB_CONS].num_ipv4_bytes;
+		con_stats->client[wlan_ep_idx].num_ipv4_bytes +
+			con_stats->client[usb_ep_idx].num_ipv4_bytes;
 	data->ipv6_rx_bytes +=
-		con_stats->client[wlan_client].num_ipv6_bytes +
-		con_stats->client[IPA_CLIENT_USB_CONS].num_ipv6_bytes;
+		con_stats->client[wlan_ep_idx].num_ipv6_bytes +
+		con_stats->client[usb_ep_idx].num_ipv6_bytes;
 
 	for (i = 0; i < MAX_WIGIG_CLIENTS; i++) {
 		enum ipa_client_type wigig_client =
@@ -5009,14 +5046,19 @@ static int rmnet_ipa3_query_tethering_stats_hw(
 		if (wigig_client > IPA_CLIENT_WIGIG4_CONS)
 			break;
 
+		ep_idx = ipa_get_ep_mapping( wigig_client );
+
+		if (ep_idx == -1 || ep_idx >= ipa3_get_max_num_pipes())
+			return ep_idx ;
+
 		data->ipv4_rx_packets +=
-			con_stats->client[wigig_client].num_ipv4_pkts;
+			con_stats->client[ep_idx].num_ipv4_pkts;
 		data->ipv6_rx_packets +=
-			con_stats->client[wigig_client].num_ipv6_pkts;
+			con_stats->client[ep_idx].num_ipv6_pkts;
 		data->ipv4_rx_bytes +=
-			con_stats->client[wigig_client].num_ipv4_bytes;
+			con_stats->client[ep_idx].num_ipv4_bytes;
 		data->ipv6_rx_bytes +=
-			con_stats->client[wigig_client].num_ipv6_bytes;
+			con_stats->client[ep_idx].num_ipv6_bytes;
 	}
 
 	IPAWANDBG("v4_rx_p(%lu) v6_rx_p(%lu) v4_rx_b(%lu) v6_rx_b(%lu)\n",
@@ -5042,18 +5084,23 @@ static int rmnet_ipa3_query_tethering_stats_hw(
 	else
 		wlan_client = IPA_CLIENT_WLAN1_CONS;
 
+	wlan_ep_idx = ipa_get_ep_mapping( wlan_client );
+
+	if (wlan_ep_idx == -1 || wlan_ep_idx >= ipa3_get_max_num_pipes())
+		return wlan_ep_idx ;
+
 	IPAWANDBG("wlan: v4_rx_p-b(%d,%lld) v6_rx_p-b(%d,%lld),client(%d)\n",
-		con_stats->client[wlan_client].num_ipv4_pkts,
-		con_stats->client[wlan_client].num_ipv4_bytes,
-		con_stats->client[wlan_client].num_ipv6_pkts,
-		con_stats->client[wlan_client].num_ipv6_bytes,
+		con_stats->client[wlan_ep_idx].num_ipv4_pkts,
+		con_stats->client[wlan_ep_idx].num_ipv4_bytes,
+		con_stats->client[wlan_ep_idx].num_ipv6_pkts,
+		con_stats->client[wlan_ep_idx].num_ipv6_bytes,
 		wlan_client);
 
 	IPAWANDBG("usb: v4_rx_p(%d) b(%lld) v6_rx_p(%d) b(%lld)\n",
-		con_stats->client[IPA_CLIENT_USB_CONS].num_ipv4_pkts,
-		con_stats->client[IPA_CLIENT_USB_CONS].num_ipv4_bytes,
-		con_stats->client[IPA_CLIENT_USB_CONS].num_ipv6_pkts,
-		con_stats->client[IPA_CLIENT_USB_CONS].num_ipv6_bytes);
+		con_stats->client[usb_ep_idx].num_ipv4_pkts,
+		con_stats->client[usb_ep_idx].num_ipv4_bytes,
+		con_stats->client[usb_ep_idx].num_ipv6_pkts,
+		con_stats->client[usb_ep_idx].num_ipv6_bytes);
 
 	for (i = 0; i < MAX_WIGIG_CLIENTS; i++) {
 		enum ipa_client_type wigig_client =
@@ -5062,26 +5109,31 @@ static int rmnet_ipa3_query_tethering_stats_hw(
 		if (wigig_client > IPA_CLIENT_WIGIG4_CONS)
 			break;
 
+		ep_idx = ipa_get_ep_mapping( wigig_client );
+
+		if (ep_idx == -1 || ep_idx >= ipa3_get_max_num_pipes())
+			return ep_idx ;
+
 		IPAWANDBG("wigig%d: v4_rx_p(%d) b(%lld) v6_rx_p(%d) b(%lld)\n",
 			i + 1,
-			con_stats->client[wigig_client].num_ipv4_pkts,
-			con_stats->client[wigig_client].num_ipv4_bytes,
-			con_stats->client[wigig_client].num_ipv6_pkts,
-			con_stats->client[wigig_client].num_ipv6_bytes);
+			con_stats->client[ep_idx].num_ipv4_pkts,
+			con_stats->client[ep_idx].num_ipv4_bytes,
+			con_stats->client[ep_idx].num_ipv6_pkts,
+			con_stats->client[ep_idx].num_ipv6_bytes);
 	}
 
 	/* update the DL stats */
 	data->ipv4_rx_packets +=
-		con_stats->client[wlan_client].num_ipv4_pkts +
+		con_stats->client[wlan_ep_idx].num_ipv4_pkts +
 			con_stats->client[IPA_CLIENT_USB_CONS].num_ipv4_pkts;
 	data->ipv6_rx_packets +=
-		con_stats->client[wlan_client].num_ipv6_pkts +
+		con_stats->client[wlan_ep_idx].num_ipv6_pkts +
 			con_stats->client[IPA_CLIENT_USB_CONS].num_ipv6_pkts;
 	data->ipv4_rx_bytes +=
-		con_stats->client[wlan_client].num_ipv4_bytes +
+		con_stats->client[wlan_ep_idx].num_ipv4_bytes +
 			con_stats->client[IPA_CLIENT_USB_CONS].num_ipv4_bytes;
 	data->ipv6_rx_bytes +=
-		con_stats->client[wlan_client].num_ipv6_bytes +
+		con_stats->client[wlan_ep_idx].num_ipv6_bytes +
 		con_stats->client[IPA_CLIENT_USB_CONS].num_ipv6_bytes;
 
 	for (i = 0; i < MAX_WIGIG_CLIENTS; i++) {
@@ -5091,14 +5143,18 @@ static int rmnet_ipa3_query_tethering_stats_hw(
 		if (wigig_client > IPA_CLIENT_WIGIG4_CONS)
 			break;
 
+		ep_idx = ipa_get_ep_mapping( wigig_client );
+
+		if (ep_idx == -1 || ep_idx >= ipa3_get_max_num_pipes())
+			return ep_idx ;
 		data->ipv4_rx_packets +=
-			con_stats->client[wigig_client].num_ipv4_pkts;
+			con_stats->client[ep_idx].num_ipv4_pkts;
 		data->ipv6_rx_packets +=
-			con_stats->client[wigig_client].num_ipv6_pkts;
+			con_stats->client[ep_idx].num_ipv6_pkts;
 		data->ipv4_rx_bytes +=
-			con_stats->client[wigig_client].num_ipv4_bytes;
+			con_stats->client[ep_idx].num_ipv4_bytes;
 		data->ipv6_rx_bytes +=
-			con_stats->client[wigig_client].num_ipv6_bytes;
+			con_stats->client[ep_idx].num_ipv6_bytes;
 	}
 
 	IPAWANDBG("v4_rx_p(%lu) v6_rx_p(%lu) v4_rx_b(%lu) v6_rx_b(%lu)\n",
@@ -5121,43 +5177,52 @@ skip_nlo_stats:
 		index = IPA_CLIENT_MHI_PRIME_TETH_CONS;
 	else
 		index = IPA_CLIENT_Q6_WAN_CONS;
+	ep_idx = ipa_get_ep_mapping( index );
+
+	if (ep_idx == -1 || ep_idx >= ipa3_get_max_num_pipes())
+		return ep_idx ;
 
 	IPAWANDBG("usb: v4_tx_p(%d) b(%lld) v6_tx_p(%d) b(%lld)\n",
-	con_stats->client[index].num_ipv4_pkts,
-	con_stats->client[index].num_ipv4_bytes,
-	con_stats->client[index].num_ipv6_pkts,
-	con_stats->client[index].num_ipv6_bytes);
+	con_stats->client[ep_idx].num_ipv4_pkts,
+	con_stats->client[ep_idx].num_ipv4_bytes,
+	con_stats->client[ep_idx].num_ipv6_pkts,
+	con_stats->client[ep_idx].num_ipv6_bytes);
 
 	/* update the USB UL stats */
 	data->ipv4_tx_packets =
-		con_stats->client[index].num_ipv4_pkts;
+		con_stats->client[ep_idx].num_ipv4_pkts;
 	data->ipv6_tx_packets =
-		con_stats->client[index].num_ipv6_pkts;
+		con_stats->client[ep_idx].num_ipv6_pkts;
 	data->ipv4_tx_bytes =
-		con_stats->client[index].num_ipv4_bytes;
+		con_stats->client[ep_idx].num_ipv4_bytes;
 	data->ipv6_tx_bytes =
-		con_stats->client[index].num_ipv6_bytes;
+		con_stats->client[ep_idx].num_ipv6_bytes;
 
 	if (ipa3_ctx->ipa_hw_type >= IPA_HW_v4_5 &&
 		ipa3_ctx->platform_type == IPA_PLAT_TYPE_MSM) {
 
 		index = IPA_CLIENT_Q6_UL_NLO_DATA_CONS;
 
+		ep_idx = ipa_get_ep_mapping( index );
+
+		if (ep_idx == -1 || ep_idx >= ipa3_get_max_num_pipes())
+			return ep_idx ;
+
 		IPAWANDBG("usb: v4_tx_p(%d) b(%lld) v6_tx_p(%d) b(%lld)\n",
-				con_stats->client[index].num_ipv4_pkts,
-				con_stats->client[index].num_ipv4_bytes,
-				con_stats->client[index].num_ipv6_pkts,
-				con_stats->client[index].num_ipv6_bytes);
+				con_stats->client[ep_idx].num_ipv4_pkts,
+				con_stats->client[ep_idx].num_ipv4_bytes,
+				con_stats->client[ep_idx].num_ipv6_pkts,
+				con_stats->client[ep_idx].num_ipv6_bytes);
 
 		/* update the USB UL stats */
 		data->ipv4_tx_packets +=
-			con_stats->client[index].num_ipv4_pkts;
+			con_stats->client[ep_idx].num_ipv4_pkts;
 		data->ipv6_tx_packets +=
-			con_stats->client[index].num_ipv6_pkts;
+			con_stats->client[ep_idx].num_ipv6_pkts;
 		data->ipv4_tx_bytes +=
-			con_stats->client[index].num_ipv4_bytes;
+			con_stats->client[ep_idx].num_ipv4_bytes;
 		data->ipv6_tx_bytes +=
-			con_stats->client[index].num_ipv6_bytes;
+			con_stats->client[ep_idx].num_ipv6_bytes;
 	}
 	/* query WLAN UL stats */
 	memset(con_stats, 0, sizeof(struct ipa_quota_stats_all));
@@ -5180,40 +5245,49 @@ skip_nlo_stats:
 	else
 		index = IPA_CLIENT_Q6_WAN_CONS;
 
+	ep_idx = ipa_get_ep_mapping( index );
+
+	if (ep_idx == -1 || ep_idx >= ipa3_get_max_num_pipes())
+		return ep_idx ;
+
 	IPAWANDBG("wlan1: v4_tx_p(%d) b(%lld) v6_tx_p(%d) b(%lld)\n",
-	con_stats->client[index].num_ipv4_pkts,
-	con_stats->client[index].num_ipv4_bytes,
-	con_stats->client[index].num_ipv6_pkts,
-	con_stats->client[index].num_ipv6_bytes);
+	con_stats->client[ep_idx].num_ipv4_pkts,
+	con_stats->client[ep_idx].num_ipv4_bytes,
+	con_stats->client[ep_idx].num_ipv6_pkts,
+	con_stats->client[ep_idx].num_ipv6_bytes);
 
 	/* update the wlan UL stats */
 	data->ipv4_tx_packets +=
-		con_stats->client[index].num_ipv4_pkts;
+		con_stats->client[ep_idx].num_ipv4_pkts;
 	data->ipv6_tx_packets +=
-		con_stats->client[index].num_ipv6_pkts;
+		con_stats->client[ep_idx].num_ipv6_pkts;
 	data->ipv4_tx_bytes +=
-		con_stats->client[index].num_ipv4_bytes;
+		con_stats->client[ep_idx].num_ipv4_bytes;
 	data->ipv6_tx_bytes +=
-		con_stats->client[index].num_ipv6_bytes;
+		con_stats->client[ep_idx].num_ipv6_bytes;
 	if (ipa3_ctx->ipa_hw_type >= IPA_HW_v4_5 &&
 		ipa3_ctx->platform_type == IPA_PLAT_TYPE_MSM) {
 		index = IPA_CLIENT_Q6_UL_NLO_DATA_CONS;
 
+		ep_idx = ipa_get_ep_mapping( index );
+
+		if (ep_idx == -1 || ep_idx >= ipa3_get_max_num_pipes())
+			return ep_idx ;
 		IPAWANDBG("wlan1: v4_tx_p(%d) b(%lld) v6_tx_p(%d) b(%lld)\n",
-				con_stats->client[index].num_ipv4_pkts,
-				con_stats->client[index].num_ipv4_bytes,
-				con_stats->client[index].num_ipv6_pkts,
-				con_stats->client[index].num_ipv6_bytes);
+				con_stats->client[ep_idx].num_ipv4_pkts,
+				con_stats->client[ep_idx].num_ipv4_bytes,
+				con_stats->client[ep_idx].num_ipv6_pkts,
+				con_stats->client[ep_idx].num_ipv6_bytes);
 
 		/* update the USB UL stats */
 		data->ipv4_tx_packets +=
-			con_stats->client[index].num_ipv4_pkts;
+			con_stats->client[ep_idx].num_ipv4_pkts;
 		data->ipv6_tx_packets +=
-			con_stats->client[index].num_ipv6_pkts;
+			con_stats->client[ep_idx].num_ipv6_pkts;
 		data->ipv4_tx_bytes +=
-			con_stats->client[index].num_ipv4_bytes;
+			con_stats->client[ep_idx].num_ipv4_bytes;
 		data->ipv6_tx_bytes +=
-			con_stats->client[index].num_ipv6_bytes;
+			con_stats->client[ep_idx].num_ipv6_bytes;
 	}
 
 	if (ipa_get_ep_mapping(IPA_CLIENT_WIGIG_PROD) !=
@@ -5233,35 +5307,44 @@ skip_nlo_stats:
 		else
 			index = IPA_CLIENT_Q6_WAN_CONS;
 
+		ep_idx = ipa_get_ep_mapping( index );
+
+		if (ep_idx == -1 || ep_idx >= ipa3_get_max_num_pipes())
+			return ep_idx ;
+
 		IPAWANDBG("wigig: v4_tx_p(%d) b(%lld) v6_tx_p(%d) b(%lld)\n",
-				con_stats->client[index].num_ipv4_pkts,
-				con_stats->client[index].num_ipv4_bytes,
-				con_stats->client[index].num_ipv6_pkts,
-				con_stats->client[index].num_ipv6_bytes);
+				con_stats->client[ep_idx].num_ipv4_pkts,
+				con_stats->client[ep_idx].num_ipv4_bytes,
+				con_stats->client[ep_idx].num_ipv6_pkts,
+				con_stats->client[ep_idx].num_ipv6_bytes);
 
 		/* update the WIGIG UL stats */
 		data->ipv4_tx_packets +=
-			con_stats->client[index].num_ipv4_pkts;
+			con_stats->client[ep_idx].num_ipv4_pkts;
 		data->ipv6_tx_packets +=
-			con_stats->client[index].num_ipv6_pkts;
+			con_stats->client[ep_idx].num_ipv6_pkts;
 		data->ipv4_tx_bytes +=
-			con_stats->client[index].num_ipv4_bytes;
+			con_stats->client[ep_idx].num_ipv4_bytes;
 		data->ipv6_tx_bytes +=
-			con_stats->client[index].num_ipv6_bytes;
+			con_stats->client[ep_idx].num_ipv6_bytes;
 
 		if (ipa3_ctx->ipa_hw_type >= IPA_HW_v4_5 &&
 				ipa3_ctx->platform_type == IPA_PLAT_TYPE_MSM) {
 			index = IPA_CLIENT_Q6_UL_NLO_DATA_CONS;
 
+			ep_idx = ipa_get_ep_mapping( index );
+
+			if (ep_idx == -1 || ep_idx >= ipa3_get_max_num_pipes())
+				return ep_idx ;
 			/* update the WIGIG UL stats */
 			data->ipv4_tx_packets +=
-				con_stats->client[index].num_ipv4_pkts;
+				con_stats->client[ep_idx].num_ipv4_pkts;
 			data->ipv6_tx_packets +=
-				con_stats->client[index].num_ipv6_pkts;
+				con_stats->client[ep_idx].num_ipv6_pkts;
 			data->ipv4_tx_bytes +=
-				con_stats->client[index].num_ipv4_bytes;
+				con_stats->client[ep_idx].num_ipv4_bytes;
 			data->ipv6_tx_bytes +=
-				con_stats->client[index].num_ipv6_bytes;
+				con_stats->client[ep_idx].num_ipv6_bytes;
 		}
 
 	} else {

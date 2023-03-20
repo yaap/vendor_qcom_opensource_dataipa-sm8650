@@ -651,6 +651,8 @@ struct ipa_smmu_cb_ctx {
 	u32 va_start;
 	u32 va_size;
 	u32 va_end;
+	u32 geometry_start;
+	u32 geometry_end;
 	bool shared;
 	bool is_cache_coherent;
 	bool done;
@@ -1929,7 +1931,7 @@ struct ipa_quota_stats {
 };
 
 struct ipa_quota_stats_all {
-	struct ipa_quota_stats client[IPA_CLIENT_MAX];
+	struct ipa_quota_stats client[IPA5_PIPES_NUM];
 };
 
 struct ipa_drop_stats {
@@ -1948,8 +1950,8 @@ struct ipa_hw_stats_quota {
 
 struct ipa_hw_stats_teth {
 	struct ipahal_stats_init_tethering init;
-	struct ipa_quota_stats_all prod_stats_sum[IPA_CLIENT_MAX];
-	struct ipa_quota_stats_all prod_stats[IPA_CLIENT_MAX];
+	struct ipa_quota_stats_all prod_stats_sum[IPA5_PIPES_NUM];
+	struct ipa_quota_stats_all prod_stats[IPA5_PIPES_NUM];
 };
 
 struct ipa_hw_stats_flt_rt {
@@ -2411,6 +2413,7 @@ struct ipa3_context {
 	bool ipa_wdi2_over_gsi;
 	bool ipa_wdi3_over_gsi;
 	bool ipa_endp_delay_wa;
+	bool lan_coal_enable;
 	bool ipa_fltrt_not_hashable;
 	bool use_xbl_boot;
 	bool use_64_bit_dma_mask;
@@ -2532,7 +2535,8 @@ struct ipa3_context {
 	struct ipa_mem_buffer ulso_wa_cmd;
 	u32 tx_wrapper_cache_max_size;
 	u32 ipa_gen_rx_cmn_page_pool_sz_factor;
-        u32 ipa_gen_rx_cmn_temp_pool_sz_factor;
+	u32 ipa_gen_rx_cmn_temp_pool_sz_factor;
+	u32 ipa_gen_rx_ll_pool_sz_factor;
 	struct ipa3_app_clock_vote app_clock_vote;
 	bool clients_registered;
 	bool ipa_gpi_event_rp_ddr;
@@ -2659,6 +2663,7 @@ struct ipa3_plat_drv_res {
 	bool ipa_gpi_event_rp_ddr;
 	bool rmnet_ctl_enable;
 	bool rmnet_ll_enable;
+	bool lan_coal_enable;
 	bool ipa_use_uc_holb_monitor;
 	u32 ipa_holb_monitor_poll_period;
 	u32 ipa_holb_monitor_max_cnt_wlan;
@@ -2668,7 +2673,8 @@ struct ipa3_plat_drv_res {
 	const char *uc_fw_file_name;
 	u32 tx_wrapper_cache_max_size;
 	u32 ipa_gen_rx_cmn_page_pool_sz_factor;
-        u32 ipa_gen_rx_cmn_temp_pool_sz_factor;
+	u32 ipa_gen_rx_cmn_temp_pool_sz_factor;
+	u32 ipa_gen_rx_ll_pool_sz_factor;
 	u32 ipa_wan_aggr_pkt_cnt;
 	bool ipa_mhi_proxy;
 	u32 max_num_smmu_cb;
