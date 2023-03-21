@@ -10,6 +10,8 @@
 
 #define UPDATE_RP_MODERATION_CONFIG 1
 #define UPDATE_RP_MODERATION_THRESHOLD 8
+#define UPDATE_RP_MODERATION_THRESHOLD_OPT_DP 1
+
 
 #define IPA_WLAN_AGGR_PKT_LIMIT 1
 #define IPA_WLAN_AGGR_BYTE_LIMIT 2 /*2 Kbytes Agger hard byte limit*/
@@ -405,6 +407,8 @@ static int ipa3_setup_wdi3_gsi_channel(u8 is_smmu_enabled,
 	/* write channel scratch */
 	memset(&ch_scratch, 0, sizeof(ch_scratch));
 	ch_scratch.wdi3.update_rp_moderation_threshold =
+		(ipa3_ctx->ipa_wdi_opt_dpath) ?
+		UPDATE_RP_MODERATION_THRESHOLD_OPT_DP :
 		UPDATE_RP_MODERATION_THRESHOLD;
 	if ((dir == IPA_WDI3_RX_DIR) || (dir == IPA_WDI3_RX2_DIR)) {
 		if (!is_smmu_enabled)
