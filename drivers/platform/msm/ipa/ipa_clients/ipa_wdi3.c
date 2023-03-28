@@ -61,6 +61,7 @@ struct ipa_wdi_opt_dpath_info {
 	ipa_wdi_opt_dpath_flt_rem_cb flt_rem_cb;
 	u32 q6_rtng_table_index;
 	u32 hdr_len;
+	atomic_t rsrv_req;
 };
 
 struct ipa_wdi_context {
@@ -1127,10 +1128,10 @@ int ipa_wdi_opt_dpath_rsrv_filter_req(
 
 	if (!ipa_wdi_ctx_list[0]->opt_dpath_info.flt_rsrv_cb)
 	{
-		IPAERR("filter resserve cb not registered");
+		IPAERR("filter reserve cb not registered");
 		resp->resp.result = IPA_QMI_RESULT_FAILURE_V01;
 		resp->resp.error = IPA_QMI_ERR_INTERNAL_V01;
-		return -1;
+		return -EPERM;
 	}
 
 	if (ipa_wdi_ctx_list[0]->wdi_version >= IPA_WDI_3) {
@@ -1150,7 +1151,7 @@ int ipa_wdi_opt_dpath_rsrv_filter_req(
 		IPA_WDI_ERR("Either TX/RX ep is not configured. \n");
 		resp->resp.result = IPA_QMI_RESULT_FAILURE_V01;
 		resp->resp.error = IPA_QMI_ERR_INTERNAL_V01;
-		return -EFAULT;
+		return -EPERM;
 	}
 
 	IPADBG("ep_tx = %d\n", ipa_ep_idx_tx);
@@ -1172,6 +1173,8 @@ int ipa_wdi_opt_dpath_rsrv_filter_req(
 			ipa_wdi_ctx_list[0]->priv, &rsrv_filter_req);
 
 	if (!ret) {
+
+		atomic_set(&ipa_wdi_ctx_list[0]->opt_dpath_info.rsrv_req, 1);
 
 		ipa_wdi_ctx_list[0]->opt_dpath_info.q6_rtng_table_index =
 			req->q6_rtng_table_index;
@@ -1214,6 +1217,7 @@ int ipa_wdi_opt_dpath_add_filter_req(
 		IPA_WDI_ERR("wdi ctx is not initialized.\n");
 		ind->filter_add_status.result = IPA_QMI_RESULT_FAILURE_V01;
 		ind->filter_add_status.error = IPA_QMI_ERR_INTERNAL_V01;
+		ind->filter_idx = req->filter_idx;
 		return -EPERM;
 	}
 
@@ -1221,7 +1225,8 @@ int ipa_wdi_opt_dpath_add_filter_req(
 		IPAERR("filter add cb not registered");
 		ind->filter_add_status.result = IPA_QMI_RESULT_FAILURE_V01;
 		ind->filter_add_status.error = IPA_QMI_ERR_INTERNAL_V01;
-		return -1;
+		ind->filter_idx = req->filter_idx;
+		return -EPERM;
 	}
 
 	if (req->ip_type != QMI_IPA_IP_TYPE_V4_V01 &&
@@ -1229,6 +1234,7 @@ int ipa_wdi_opt_dpath_add_filter_req(
 		IPAERR("Invalid IP Type: %d\n", req->ip_type);
 		ind->filter_add_status.result = IPA_QMI_RESULT_FAILURE_V01;
 		ind->filter_add_status.error = IPA_QMI_ERR_INTERNAL_V01;
+		ind->filter_idx = req->filter_idx;
 		return -1;
 	}
 
@@ -1297,17 +1303,19 @@ int ipa_wdi_opt_dpath_remove_filter_req(
 
 	if (!ipa_wdi_ctx_list[0]) {
 		IPA_WDI_ERR("wdi ctx is not initialized.\n");
-		ind->filter_removal_status.result = IPA_QMI_RESULT_FAILURE_V01;
-		ind->filter_removal_status.error = IPA_QMI_ERR_INTERNAL_V01;
+		ind->filter_removal_status.result = IPA_QMI_RESULT_SUCCESS_V01;
+		ind->filter_removal_status.error = IPA_QMI_ERR_NONE_V01;
+		ind->filter_idx = req->filter_idx;
 		return -EPERM;
 	}
 
 	if (!ipa_wdi_ctx_list[0]->opt_dpath_info.flt_rem_cb)
 	{
-		IPAERR("filter add cb not registered");
-		ind->filter_removal_status.result = IPA_QMI_RESULT_FAILURE_V01;
-		ind->filter_removal_status.error = IPA_QMI_ERR_INTERNAL_V01;
-		return -1;
+		IPAERR("filter remove cb not registered");
+		ind->filter_removal_status.result = IPA_QMI_RESULT_SUCCESS_V01;
+		ind->filter_removal_status.error = IPA_QMI_ERR_NONE_V01;
+		ind->filter_idx = req->filter_idx;
+		return -EPERM;
 	}
 
 	flt_rem_req.num_tuples = 1;
@@ -1349,18 +1357,23 @@ int ipa_wdi_opt_dpath_remove_all_filter_req(
 
 	if (!ipa_wdi_ctx_list[0]) {
 		IPA_WDI_ERR("wdi ctx is not initialized.\n");
-		resp->resp.result = IPA_QMI_RESULT_FAILURE_V01;
-		resp->resp.error = IPA_QMI_ERR_INTERNAL_V01;
 		return -EPERM;
 	}
 
 	if (!ipa_wdi_ctx_list[0]->opt_dpath_info.flt_rsrv_rel_cb)
 	{
-		IPAERR("filter add cb not registered");
-		resp->resp.result = IPA_QMI_RESULT_FAILURE_V01;
-		resp->resp.error = IPA_QMI_ERR_INTERNAL_V01;
-		return -1;
+		IPAERR("filter release cb not registered");
+		return -EPERM;
 	}
+
+
+	if (!atomic_read(&ipa_wdi_ctx_list[0]->opt_dpath_info.rsrv_req))
+	{
+		IPAERR("Reservation request not sent. IGNORE");
+		return 0;
+	}
+
+	atomic_set(&ipa_wdi_ctx_list[0]->opt_dpath_info.rsrv_req, 0);
 
 	ret =
 		ipa_wdi_ctx_list[0]->opt_dpath_info.flt_rsrv_rel_cb(
@@ -1378,7 +1391,7 @@ int ipa_wdi_opt_dpath_remove_all_filter_req(
 
 	if (ipa_ep_idx_rx <= 0) {
 		IPA_WDI_ERR("Either RX ep is not configured. \n");
-		return -EFAULT;
+		return 0;
 	}
 
 	ipa3_disable_wdi3_opt_dpath(ipa_ep_idx_rx);

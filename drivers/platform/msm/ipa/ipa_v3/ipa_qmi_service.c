@@ -1690,11 +1690,13 @@ static void ipa3_handle_ipa_wlan_opt_dp_rsrv_filter_req(struct qmi_handle *qmi_h
 	const void *decoded_msg)
 {
 	struct ipa_wlan_opt_dp_rsrv_filter_resp_msg_v01 resp;
+	struct ipa_wlan_opt_dp_rsrv_filter_complt_ind_msg_v01 ind;
 	struct ipa_wlan_opt_dp_rsrv_filter_req_msg_v01 *req =
 		(struct ipa_wlan_opt_dp_rsrv_filter_req_msg_v01 *)decoded_msg;
-	int rc = 0 ;
+	int rc = 0, rc1 = 0;
 
 	memset(&resp, 0, sizeof(resp));
+	memset(&ind, 0, sizeof(ind));
 
 	IPAWANDBG("rsrv_filter_req: num_fltrs %d, timeout_val %d, rtng_table %d\n",
 		req->num_filters, req->timeout_val_ms, req->q6_rtng_table_index);
@@ -1704,16 +1706,22 @@ static void ipa3_handle_ipa_wlan_opt_dp_rsrv_filter_req(struct qmi_handle *qmi_h
 	IPAWANDBG("qmi_snd_rsp: result %d, err %d\n",
 		resp.resp.result, resp.resp.error);
 
-	rc = qmi_send_response(qmi_handle, sq, txn,
+	rc1 = qmi_send_response(qmi_handle, sq, txn,
 		QMI_IPA_WLAN_OPT_DATAPATH_RSRV_FILTER_RESP_V01,
 		IPA_WLAN_OPT_DP_RSRV_FILTER_RESP_MSG_V01_MAX_MSG_LEN,
 		ipa_wlan_opt_dp_rsrv_filter_resp_msg_data_v01_ei,
 		&resp);
 
-	if (rc < 0)
+	if (rc1 < 0)
 		IPAWANERR("Reserve filter rules response failed\n");
 	else
 		IPAWANDBG("Replied to install filter request\n");
+
+	/* If rsrv filter request, fails, send indication immediately. */
+	if (rc < 0) {
+		ind.rsrv_filter_status = resp.resp;
+		ipa3_qmi_send_wdi_opt_dpath_rsrv_flt_ind(&ind);
+	}
 }
 
 static void ipa3_handle_ipa_wlan_opt_dp_remove_all_filter_req(struct qmi_handle *qmi_handle,
@@ -1722,9 +1730,11 @@ static void ipa3_handle_ipa_wlan_opt_dp_remove_all_filter_req(struct qmi_handle 
 	const void *decoded_msg)
 {
 	struct ipa_wlan_opt_dp_remove_all_filter_resp_msg_v01 resp;
-	int rc = 0 ;
+	struct ipa_wlan_opt_dp_remove_all_filter_complt_ind_msg_v01 ind;
+	int rc = 0, rc1 = 0;
 
 	memset(&resp, 0, sizeof(resp));
+	memset(&ind, 0, sizeof(ind));
 
 	IPAWANDBG("remove_all_filter_req:\n");
 
@@ -1734,16 +1744,23 @@ static void ipa3_handle_ipa_wlan_opt_dp_remove_all_filter_req(struct qmi_handle 
 	IPAWANDBG("qmi_snd_rsp: result %d, err %d\n",
 		resp.resp.result, resp.resp.error);
 
-	rc = qmi_send_response(qmi_handle, sq, txn,
+	rc1 = qmi_send_response(qmi_handle, sq, txn,
 		QMI_IPA_WLAN_OPT_DATAPATH_REMOVE_ALL_FILTER_RESP_V01,
 		IPA_WLAN_OPT_DP_REMOVE_ALL_FILTER_RESP_MSG_V01_MAX_MSG_LEN,
 		ipa_wlan_opt_dp_remove_all_filter_resp_msg_data_v01_ei,
 		&resp);
 
-	if (rc < 0)
+	if (rc1 < 0)
 		IPAWANERR("Remove all filter rules failed\n");
 	else
 		IPAWANDBG("Replied to remove all filter request\n");
+
+	/* If remove filter request fails, send indication immediately. */
+	if (rc < 0) {
+		ind.filter_removal_all_status = resp.resp;
+		ipa3_qmi_send_wdi_opt_dpath_rmv_all_flt_ind(&ind);
+	}
+
 }
 
 static void ipa3_handle_ipa_wlan_opt_dp_add_filter_req(struct qmi_handle *qmi_handle,

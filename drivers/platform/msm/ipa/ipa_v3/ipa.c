@@ -5453,15 +5453,10 @@ void ipa3_q6_pre_shutdown_cleanup(void)
 
 		struct ipa_wlan_opt_dp_remove_all_filter_req_msg_v01 req;
 		struct ipa_wlan_opt_dp_remove_all_filter_resp_msg_v01 resp;
-		int rc = 0 ;
 
 		memset(&req, 0, sizeof(struct ipa_wlan_opt_dp_remove_all_filter_req_msg_v01));
 
-		rc = ipa_wdi_opt_dpath_remove_all_filter_req(&req, &resp);
-		if (rc < 0)
-			IPAWANERR("Remove all filter rules failed\n");
-		else
-			IPAWANDBG("Remove all filter successful\n");
+		ipa_wdi_opt_dpath_remove_all_filter_req(&req, &resp);
 	}
 
 	if (ipa3_q6_clean_q6_tables()) {
