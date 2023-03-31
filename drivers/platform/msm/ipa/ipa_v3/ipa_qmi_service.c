@@ -2716,6 +2716,11 @@ int ipa3_qmi_send_wdi_opt_dpath_rmv_all_flt_ind(
 	if (unlikely(!ipa3_svc_handle))
 		return -ETIMEDOUT;
 
+	if (atomic_read(&ipa3_ctx->is_ssr)) {
+		IPAWANDBG("SSR in progress , no need to send ind\n");
+		return 0;
+	}
+
 	IPAWANDBG("wdi_opt_dpath_rmv_all_flt_ind: result %d, err %d\n",
 		ind->filter_removal_all_status.result,
 		ind->filter_removal_all_status.error);
