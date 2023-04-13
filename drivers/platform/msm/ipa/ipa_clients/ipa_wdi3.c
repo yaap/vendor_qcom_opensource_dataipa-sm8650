@@ -809,6 +809,14 @@ int ipa_wdi_enable_pipes_per_inst(ipa_wdi_hdl_t hdl)
 		}
 	}
 
+	if (ipa3_ctx->ipa_wdi_opt_dpath){
+		ret = ipa_pm_deferred_deactivate(ipa_wdi_ctx_list[hdl]->ipa_pm_hdl);
+		if (ret) {
+			IPA_WDI_DBG("fail to deactivate ipa pm\n");
+			return -EFAULT;
+		}
+	}
+
 	return 0;
 }
 EXPORT_SYMBOL(ipa_wdi_enable_pipes_per_inst);
@@ -1086,6 +1094,8 @@ int ipa_wdi_opt_dpath_notify_flt_rlsd_per_inst
 		return -EPERM;
 	}
 
+	ret = ipa_pm_deferred_deactivate(ipa_wdi_ctx_list[0]->ipa_pm_hdl);
+
 	memset(&ind, 0, sizeof(ind));
 	ind.filter_removal_all_status.result =
 		(is_success == true) ? IPA_QMI_RESULT_SUCCESS_V01:IPA_QMI_RESULT_FAILURE_V01;
@@ -1110,7 +1120,7 @@ int ipa_wdi_opt_dpath_rsrv_filter_req(
 		struct ipa_wlan_opt_dp_rsrv_filter_req_msg_v01 *req,
 		struct ipa_wlan_opt_dp_rsrv_filter_resp_msg_v01 *resp)
 {
-	int ret = 0;
+	int ret = 0, ret1 =0;
 	int ipa_ep_idx_tx, ipa_ep_idx_rx;
 	struct ipa_wdi_opt_dpath_flt_rsrv_cb_params rsrv_filter_req;
 	struct ipa_wlan_opt_dp_set_wlan_per_info_req_msg_v01 set_wlan_ep_req;
@@ -1164,6 +1174,15 @@ int ipa_wdi_opt_dpath_rsrv_filter_req(
 			ipa_wdi_ctx_list[0]->opt_dpath_info.hdr_len :
 			ETH_HLEN);
 
+	ret = ipa_pm_activate_sync(ipa_wdi_ctx_list[0]->ipa_pm_hdl);
+	if (ret) {
+		IPA_WDI_DBG("fail to activate ipa pm\n");
+		resp->resp.result = IPA_QMI_RESULT_FAILURE_V01;
+		resp->resp.error = IPA_QMI_ERR_INTERNAL_V01;
+		return -EFAULT;
+	}
+
+
 	ipa3_qmi_send_wdi_opt_dpath_ep_info(&set_wlan_ep_req);
 
 	rsrv_filter_req.num_filters = req->num_filters;
@@ -1181,6 +1200,11 @@ int ipa_wdi_opt_dpath_rsrv_filter_req(
 
 		ipa3_enable_wdi3_opt_dpath(ipa_ep_idx_rx,
 			ipa_wdi_ctx_list[0]->opt_dpath_info.q6_rtng_table_index);
+	} else {
+		ret1 = ipa_pm_deferred_deactivate(ipa_wdi_ctx_list[0]->ipa_pm_hdl);
+		if (ret1) {
+			IPA_WDI_DBG("fail to deactivate ipa pm\n");
+		}
 	}
 
 	resp->resp.result = ret;
@@ -1365,7 +1389,6 @@ int ipa_wdi_opt_dpath_remove_all_filter_req(
 		IPAERR("filter release cb not registered");
 		return -EPERM;
 	}
-
 
 	if (!atomic_read(&ipa_wdi_ctx_list[0]->opt_dpath_info.rsrv_req))
 	{
