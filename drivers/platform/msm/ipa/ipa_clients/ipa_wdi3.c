@@ -1179,7 +1179,7 @@ int ipa_wdi_opt_dpath_rsrv_filter_req(
 		ipa_wdi_ctx_list[0]->opt_dpath_info.q6_rtng_table_index =
 			req->q6_rtng_table_index;
 
-		ipa3_enable_wdi3_opt_dpath(ipa_ep_idx_rx,
+		ipa3_enable_wdi3_opt_dpath(ipa_ep_idx_rx, ipa_ep_idx_tx,
 			ipa_wdi_ctx_list[0]->opt_dpath_info.q6_rtng_table_index);
 	}
 
@@ -1351,7 +1351,7 @@ int ipa_wdi_opt_dpath_remove_all_filter_req(
 			struct ipa_wlan_opt_dp_remove_all_filter_resp_msg_v01 *resp)
 {
 	int ret = 0;
-	int ipa_ep_idx_rx;
+	int ipa_ep_idx_rx, ipa_ep_idx_tx;
 
 	memset(resp, 0, sizeof(struct ipa_wlan_opt_dp_remove_all_filter_resp_msg_v01));
 
@@ -1382,19 +1382,22 @@ int ipa_wdi_opt_dpath_remove_all_filter_req(
 	if (ipa_wdi_ctx_list[0]->wdi_version >= IPA_WDI_3) {
 		if (IPA_CLIENT_IS_WLAN0_INSTANCE(ipa_wdi_ctx_list[0]->inst_id)) {
 			ipa_ep_idx_rx = ipa_get_ep_mapping(IPA_CLIENT_WLAN2_PROD);
+			ipa_ep_idx_tx = ipa_get_ep_mapping(IPA_CLIENT_WLAN2_CONS);
 		} else {
 			ipa_ep_idx_rx = ipa_get_ep_mapping(IPA_CLIENT_WLAN3_PROD);
+			ipa_ep_idx_tx = ipa_get_ep_mapping(IPA_CLIENT_WLAN4_CONS);
 		}
 	} else {
 		ipa_ep_idx_rx = ipa_get_ep_mapping(IPA_CLIENT_WLAN1_PROD);
+		ipa_ep_idx_tx = ipa_get_ep_mapping(IPA_CLIENT_WLAN1_CONS);
 	}
 
-	if (ipa_ep_idx_rx <= 0) {
-		IPA_WDI_ERR("Either RX ep is not configured. \n");
+	if (ipa_ep_idx_rx <= 0 || ipa_ep_idx_tx <= 0) {
+		IPA_WDI_ERR("Either RX ep or TX ep is not configured. \n");
 		return 0;
 	}
 
-	ipa3_disable_wdi3_opt_dpath(ipa_ep_idx_rx);
+	ipa3_disable_wdi3_opt_dpath(ipa_ep_idx_rx, ipa_ep_idx_tx);
 
 	resp->resp.result = ret;
 	resp->resp.error = IPA_QMI_ERR_NONE_V01;

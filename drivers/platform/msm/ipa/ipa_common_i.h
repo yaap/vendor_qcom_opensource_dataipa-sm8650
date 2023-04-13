@@ -630,9 +630,9 @@ int ipa3_enable_wdi3_pipes(int ipa_ep_idx_tx, int ipa_ep_idx_rx,
 int ipa3_disable_wdi3_pipes(int ipa_ep_idx_tx, int ipa_ep_idx_rx,
 	int ipa_ep_idx_tx1);
 
-int ipa3_enable_wdi3_opt_dpath(int ipa_ep_idx_rx, u32 rt_tbl_idx);
-
-int ipa3_disable_wdi3_opt_dpath(int ipa_ep_idx_rx);
+int ipa3_enable_wdi3_opt_dpath(int ipa_ep_idx_rx, int ipa_ep_idx_tx,
+	u32 rt_tbl_idx);
+int ipa3_disable_wdi3_opt_dpath(int ipa_ep_idx_rx, int ipa_ep_idx_tx);
 
 const char *ipa_get_version_string(enum ipa_hw_type ver);
 int ipa3_start_gsi_channel(u32 clnt_hdl);

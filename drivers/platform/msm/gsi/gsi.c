@@ -3415,6 +3415,11 @@ int gsi_start_channel(unsigned long chan_hdl)
 
 	ctx = &gsi_ctx->chan[chan_hdl];
 
+	if (ctx->state == GSI_CHAN_STATE_STARTED) {
+		GSIDBG("chan_hdl=%lu already in started state\n", chan_hdl);
+		return GSI_STATUS_SUCCESS;
+	}
+
 	if (ctx->state != GSI_CHAN_STATE_ALLOCATED &&
 		ctx->state != GSI_CHAN_STATE_STOP_IN_PROC &&
 		ctx->state != GSI_CHAN_STATE_STOPPED) {

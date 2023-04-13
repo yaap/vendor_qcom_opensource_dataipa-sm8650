@@ -1034,7 +1034,7 @@ int ipa3_disconn_wdi3_pipes(int ipa_ep_idx_tx, int ipa_ep_idx_rx,
 		ipa3_uc_debug_stats_dealloc(IPA_HW_PROTOCOL_WDI3);
 
 	if (ipa3_ctx->ipa_wdi_opt_dpath)
-		ipa3_disable_wdi3_opt_dpath(ipa_ep_idx_rx);
+		ipa3_disable_wdi3_opt_dpath(ipa_ep_idx_rx, ipa_ep_idx_tx);
 
 	ipa3_delete_dflt_flt_rules(ipa_ep_idx_rx);
 	memset(ep_rx, 0, sizeof(struct ipa3_ep_context));
@@ -1404,43 +1404,81 @@ int ipa3_get_wdi3_gsi_stats(struct ipa_uc_dbg_ring_stats *stats)
 	return 0;
 }
 
-int ipa3_enable_wdi3_opt_dpath(int ipa_ep_idx_rx, u32 rt_tbl_idx)
+int ipa3_enable_wdi3_opt_dpath(int ipa_ep_idx_rx, int ipa_ep_idx_tx,
+	u32 rt_tbl_idx)
 {
 	int result = 0;
+	struct ipa3_ep_context *ep_tx = NULL;
 
 	/* wdi3 only support over gsi */
 	if (ipa_get_wdi_version() < IPA_WDI_3) {
-		IPAERR("wdi3 over uc offload not supported");
-		WARN_ON(1);
+		IPADBG("wdi3 over uc offload not supported");
 		return -EFAULT;
 	}
 
-	IPADBG("ep_rx = %d\n", ipa_ep_idx_rx);
+	IPADBG("ep_rx = %d, ep_tx = %d\n", ipa_ep_idx_rx, ipa_ep_idx_tx);
 	IPADBG("rt_tbl_idx = %d\n", rt_tbl_idx);
+
+	IPA_ACTIVE_CLIENTS_INC_SIMPLE();
 
 	/* Install default filter rules.*/
 	ipa3_install_dl_opt_wdi_dpath_flt_rules(ipa_ep_idx_rx, rt_tbl_idx);
+
+	result = ipa3_enable_data_path(ipa_ep_idx_tx);
+	if (result) {
+		IPADBG("enable data path failed res=%d clnt=%d\n", result,
+			ipa_ep_idx_tx);
+	}
+
+	ep_tx = &ipa3_ctx->ep[ipa_ep_idx_tx];
+	/* start gsi tx channel */
+	result = gsi_start_channel(ep_tx->gsi_chan_hdl);
+	if (result) {
+		IPADBG("failed to start gsi tx channel\n");
+	}
+
+	IPA_ACTIVE_CLIENTS_DEC_SIMPLE();
 
 	return result;
 }
 EXPORT_SYMBOL(ipa3_enable_wdi3_opt_dpath);
 
-int ipa3_disable_wdi3_opt_dpath(int ipa_ep_idx_rx)
+int ipa3_disable_wdi3_opt_dpath(int ipa_ep_idx_rx, int ipa_ep_idx_tx)
 {
 	int result = 0;
 
 	/* wdi3 only support over gsi */
 	if (ipa_get_wdi_version() < IPA_WDI_3) {
-		IPAERR("wdi3 over uc offload not supported");
-		WARN_ON(1);
+		IPADBG("wdi3 over uc offload not supported");
 		return -EFAULT;
 	}
 
-	IPADBG("ep_rx = %d\n", ipa_ep_idx_rx);
+	IPA_ACTIVE_CLIENTS_INC_SIMPLE();
+
+	IPADBG("ep_rx = %d, ep_tx = %d\n", ipa_ep_idx_rx, ipa_ep_idx_tx);
 
 	/* Install default filter rules.*/
 	ipa3_delete_dl_opt_wdi_dpath_flt_rules(ipa_ep_idx_rx);
 
+	/* disable tx data path */
+	result = ipa3_disable_data_path(ipa_ep_idx_tx);
+	if (result) {
+		IPADBG("disable data path failed res=%d clnt=%d.\n", result,
+			ipa_ep_idx_tx);
+		result = -EFAULT;
+		goto fail;
+	}
+
+	/* stop gsi tx channel */
+	result = ipa_stop_gsi_channel(ipa_ep_idx_tx);
+	if (result) {
+		IPADBG("failed to stop gsi tx channel\n");
+		result = -EFAULT;
+		goto fail;
+	}
+
+fail:
+	IPA_ACTIVE_CLIENTS_DEC_SIMPLE();
 	return result;
 }
 EXPORT_SYMBOL(ipa3_disable_wdi3_opt_dpath);
