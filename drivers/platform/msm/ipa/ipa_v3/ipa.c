@@ -5449,6 +5449,15 @@ void ipa3_q6_pre_shutdown_cleanup(void)
 			ipa3_set_reset_client_cons_pipe_sus_holb(true,
 				IPA_CLIENT_MHI2_CONS);
 	}
+	if (ipa3_ctx->ipa_wdi_opt_dpath){
+
+		struct ipa_wlan_opt_dp_remove_all_filter_req_msg_v01 req;
+		struct ipa_wlan_opt_dp_remove_all_filter_resp_msg_v01 resp;
+
+		memset(&req, 0, sizeof(struct ipa_wlan_opt_dp_remove_all_filter_req_msg_v01));
+
+		ipa_wdi_opt_dpath_remove_all_filter_req(&req, &resp);
+	}
 
 	if (ipa3_q6_clean_q6_tables()) {
 		IPAERR("Failed to clean Q6 tables\n");
@@ -9287,6 +9296,7 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 	ipa3_ctx->uc_act_tbl_valid = false;
 	ipa3_ctx->uc_act_tbl_total = 0;
 	ipa3_ctx->uc_act_tbl_next_index = 0;
+	ipa3_ctx->ipa_wdi_opt_dpath = resource_p->ipa_wdi_opt_dpath;
 
 	if (resource_p->gsi_fw_file_name) {
 		ipa3_ctx->gsi_fw_file_name =
@@ -9516,8 +9526,8 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 	atomic_set(&ipa3_ctx->ipa3_active_clients.cnt, 1);
 
 	/* Create workqueues for power management */
-	ipa3_ctx->power_mgmt_wq =
-		create_singlethread_workqueue("ipa_power_mgmt");
+	ipa3_ctx->power_mgmt_wq = alloc_workqueue("ipa_power_mgmt",
+			WQ_MEM_RECLAIM | WQ_UNBOUND | WQ_SYSFS | WQ_HIGHPRI, 1);
 	if (!ipa3_ctx->power_mgmt_wq) {
 		IPAERR("failed to create power mgmt wq\n");
 		result = -ENOMEM;
@@ -10575,6 +10585,13 @@ static int get_ipa_dts_configuration(struct platform_device *pdev,
 		"qcom,ipa-mhi-proxy");
 	IPADBG(": Use mhi proxy = %s\n",
 		ipa_drv_res->ipa_mhi_proxy
+		? "True" : "False");
+
+	ipa_drv_res->ipa_wdi_opt_dpath =
+		of_property_read_bool(pdev->dev.of_node,
+		"qcom,ipa-wdi-opt-dpath");
+	IPADBG(": Use optimized datapath = %s\n",
+		ipa_drv_res->ipa_wdi_opt_dpath
 		? "True" : "False");
 
 	/* Get IPA wrapper address */
