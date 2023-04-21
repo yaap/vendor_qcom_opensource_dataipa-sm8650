@@ -1241,7 +1241,7 @@ int ipa3_qmi_ul_filter_request_send(
 		}
 		if(ipa3_qmi_ctx->ipa_configure_ul_firewall_rules_req_msg_cache_ptr
 			[ipa3_qmi_ctx->num_ipa_configure_ul_firewall_rules_req_msg] == NULL){
-			IPAWANERR(" Memory Allocation  failed \n");
+			IPAWANERR_RL(" Memory Allocation  failed \n");
 		     }
 		else{
 			memcpy(
@@ -1272,7 +1272,7 @@ int ipa3_qmi_ul_filter_request_send(
 		IPAWANDBG("IPACM passed 0 rules to Q6\n");
 
 	if (req->firewall_rules_list_len >= QMI_IPA_MAX_UL_FIREWALL_RULES_V01) {
-		IPAWANERR(
+		IPAWANERR_RL(
 		"Number of rules passed by IPACM, %d, exceed limit %d\n",
 			req->firewall_rules_list_len,
 			QMI_IPA_MAX_UL_FIREWALL_RULES_V01);
@@ -1285,7 +1285,7 @@ int ipa3_qmi_ul_filter_request_send(
 				QMI_IPA_IP_TYPE_V4_V01 &&
 			req->firewall_rules_list[i].ip_type !=
 				QMI_IPA_IP_TYPE_V6_V01) {
-			IPAWANERR("Invalid IP type %d\n",
+			IPAWANERR_RL("Invalid IP type %d\n",
 					req->firewall_rules_list[i].ip_type);
 			return -EINVAL;
 		}
@@ -1309,7 +1309,7 @@ int ipa3_qmi_ul_filter_request_send(
 		&resp_desc, &resp,
 		QMI_SEND_REQ_TIMEOUT_MS);
 	if (rc < 0) {
-		IPAWANERR("send Req %d failed, rc= %d\n",
+		IPAWANERR_RL("send Req %d failed, rc= %d\n",
 			QMI_IPA_INSTALL_UL_FIREWALL_RULES_REQ_V01,
 			rc);
 		return rc;
@@ -1468,14 +1468,14 @@ int ipa3_qmi_filter_notify_send(
 		IPAWANDBG(" delete UL filter rule for pipe %d\n",
 		req->source_pipe_index);
 	} else if (req->rule_id_ex_len > QMI_IPA_MAX_FILTERS_EX2_V01) {
-		IPAWANERR(" UL filter rule for pipe %d exceed max (%u)\n",
+		IPAWANERR_RL(" UL filter rule for pipe %d exceed max (%u)\n",
 		req->source_pipe_index,
 		req->rule_id_ex_len);
 		return -EINVAL;
 	}
 
 	if (req->install_status != IPA_QMI_RESULT_SUCCESS_V01) {
-		IPAWANERR(" UL filter rule for pipe %d install_status = %d\n",
+		IPAWANERR_RL(" UL filter rule for pipe %d install_status = %d\n",
 			req->source_pipe_index, req->install_status);
 		return -EINVAL;
 	} else if ((req->rule_id_valid != 1) &&
