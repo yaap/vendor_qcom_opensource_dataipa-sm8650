@@ -1,6 +1,6 @@
 ifneq ($(TARGET_BOARD_PLATFORM),qssi)
 
-GSI_DLKM_PLATFORMS_LIST := taro kalama bengal monaco pineapple
+GSI_DLKM_PLATFORMS_LIST := taro kalama bengal monaco pineapple blair holi
 
 #Enabling BAZEL
 LOCAL_MODULE_DDK_BUILD := true
