@@ -2349,7 +2349,7 @@ static int ipa3_ioctl_fnr_counter_alloc(unsigned long arg)
 
 	if (copy_from_user(header, (const void __user *)arg,
 		sizeof(struct ipa_ioc_flt_rt_counter_alloc))) {
-		IPAERR("copy_from_user fails\n");
+		IPAERR_RL("copy_from_user fails\n");
 		return -EFAULT;
 	}
 	if (((struct ipa_ioc_flt_rt_counter_alloc *)
@@ -2358,25 +2358,25 @@ static int ipa3_ioctl_fnr_counter_alloc(unsigned long arg)
 		((struct ipa_ioc_flt_rt_counter_alloc *)
 		header)->sw_counter.num_counters >
 		IPA_FLT_RT_SW_COUNTER) {
-		IPAERR("failed: wrong sw/hw num_counters\n");
+		IPAERR_RL("failed: wrong sw/hw num_counters\n");
 		return -EPERM;
 	}
 	if (((struct ipa_ioc_flt_rt_counter_alloc *)
 		header)->hw_counter.num_counters == 0 &&
 		((struct ipa_ioc_flt_rt_counter_alloc *)
 		header)->sw_counter.num_counters == 0) {
-		IPAERR("failed: both sw/hw num_counters 0\n");
+		IPAERR_RL("failed: both sw/hw num_counters 0\n");
 		return -EPERM;
 	}
 	retval = ipa3_alloc_counter_id
 		((struct ipa_ioc_flt_rt_counter_alloc *)header);
 	if (retval < 0) {
-		IPAERR("ipa3_alloc_counter_id failed\n");
+		IPAERR_RL("ipa3_alloc_counter_id failed\n");
 		return retval;
 	}
 	if (copy_to_user((void __user *)arg, header,
 		sizeof(struct ipa_ioc_flt_rt_counter_alloc))) {
-		IPAERR("copy_to_user fails\n");
+		IPAERR_RL("copy_to_user fails\n");
 		ipa3_counter_remove_hdl(
 		((struct ipa_ioc_flt_rt_counter_alloc *)
 		header)->hdl);
