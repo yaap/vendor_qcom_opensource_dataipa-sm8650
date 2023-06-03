@@ -2076,7 +2076,7 @@ int ipa3_reset_rt(enum ipa_ip_type ip, bool user_only)
 	/* commit the change to IPA-HW */
 	if (ipa3_ctx->ctrl->ipa3_commit_rt(IPA_IP_v4) ||
 		ipa3_ctx->ctrl->ipa3_commit_rt(IPA_IP_v6)) {
-		IPAERR("fail to commit rt-rule\n");
+		IPAERR_RL("fail to commit rt-rule\n");
 		WARN_ON_RATELIMIT_IPA(1);
 		mutex_unlock(&ipa3_ctx->lock);
 		return -EPERM;
