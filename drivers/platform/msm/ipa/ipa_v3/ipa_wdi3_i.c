@@ -714,9 +714,22 @@ int ipa3_conn_wdi3_pipes(struct ipa_wdi_conn_in_params *in,
 		memcpy(&ep_rx->cfg, &in->u_rx.rx_smmu.ipa_ep_cfg,
 			sizeof(ep_rx->cfg));
 
+	if (ipa3_ctx->ipa_wdi_opt_dpath) {
+		ep_rx->cfg.cfg.frag_offload_en = true;
+		ep_rx->status.status_en = true;
+		ep_rx->status.status_ep =
+			ipa_get_ep_mapping(IPA_CLIENT_Q6_WAN_CONS);
+		ep_rx->status.status_pkt_suppress = true;
+	}
+
 	if (ipa3_cfg_ep(ipa_ep_idx_rx, &ep_rx->cfg)) {
 		IPAERR("fail to setup rx pipe cfg\n");
 		result = -EFAULT;
+		goto fail;
+	}
+
+	if (ipa3_cfg_ep_status(ipa_ep_idx_rx, &ep_rx->status)) {
+		IPAERR("fail to configure status of EP.\n");
 		goto fail;
 	}
 

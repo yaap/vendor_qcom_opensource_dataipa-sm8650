@@ -4911,8 +4911,14 @@ static int rmnet_ipa3_query_tethering_stats_hw(
 		enum ipa_client_type wigig_client =
 			rmnet_ipa3_get_wigig_cons(i);
 
-		if (wigig_client > IPA_CLIENT_WIGIG4_CONS)
-			break;
+		if (ipa3_ctx->ipa_hw_type >= IPA_HW_v5_5) {
+			if (wigig_client > IPA_CLIENT_WIGIG3_CONS)
+				break;
+		}
+		else {
+			if (wigig_client > IPA_CLIENT_WIGIG4_CONS)
+				break;
+		}
 
 		ep_idx = ipa_get_ep_mapping( wigig_client );
 
@@ -4946,8 +4952,14 @@ static int rmnet_ipa3_query_tethering_stats_hw(
 		enum ipa_client_type wigig_client =
 			rmnet_ipa3_get_wigig_cons(i);
 
-		if (wigig_client > IPA_CLIENT_WIGIG4_CONS)
-			break;
+		if (ipa3_ctx->ipa_hw_type >= IPA_HW_v5_5) {
+			if (wigig_client > IPA_CLIENT_WIGIG3_CONS)
+				break;
+		}
+		else {
+			if (wigig_client > IPA_CLIENT_WIGIG4_CONS)
+				break;
+		}
 
 		ep_idx = ipa_get_ep_mapping( wigig_client );
 
@@ -5010,8 +5022,15 @@ static int rmnet_ipa3_query_tethering_stats_hw(
 		enum ipa_client_type wigig_client =
 			rmnet_ipa3_get_wigig_cons(i);
 
-		if (wigig_client > IPA_CLIENT_WIGIG4_CONS)
-			break;
+		if (ipa3_ctx->ipa_hw_type >= IPA_HW_v5_5) {
+			if (wigig_client > IPA_CLIENT_WIGIG3_CONS)
+				break;
+		}
+		else {
+			if (wigig_client > IPA_CLIENT_WIGIG4_CONS)
+				break;
+		}
+
 		ep_idx = ipa_get_ep_mapping( wigig_client );
 
 		if (ep_idx == -1 || ep_idx >= ipa3_get_max_num_pipes())
@@ -5043,8 +5062,14 @@ static int rmnet_ipa3_query_tethering_stats_hw(
 		enum ipa_client_type wigig_client =
 			rmnet_ipa3_get_wigig_cons(i);
 
-		if (wigig_client > IPA_CLIENT_WIGIG4_CONS)
-			break;
+		if (ipa3_ctx->ipa_hw_type >= IPA_HW_v5_5) {
+			if (wigig_client > IPA_CLIENT_WIGIG3_CONS)
+				break;
+		}
+		else {
+			if (wigig_client > IPA_CLIENT_WIGIG4_CONS)
+				break;
+		}
 
 		ep_idx = ipa_get_ep_mapping( wigig_client );
 
@@ -5106,8 +5131,14 @@ static int rmnet_ipa3_query_tethering_stats_hw(
 		enum ipa_client_type wigig_client =
 			rmnet_ipa3_get_wigig_cons(i);
 
-		if (wigig_client > IPA_CLIENT_WIGIG4_CONS)
-			break;
+		if (ipa3_ctx->ipa_hw_type >= IPA_HW_v5_5) {
+			if (wigig_client > IPA_CLIENT_WIGIG3_CONS)
+				break;
+		}
+		else {
+			if (wigig_client > IPA_CLIENT_WIGIG4_CONS)
+				break;
+		}
 
 		ep_idx = ipa_get_ep_mapping( wigig_client );
 
@@ -5140,8 +5171,14 @@ static int rmnet_ipa3_query_tethering_stats_hw(
 		enum ipa_client_type wigig_client =
 			rmnet_ipa3_get_wigig_cons(i);
 
-		if (wigig_client > IPA_CLIENT_WIGIG4_CONS)
-			break;
+		if (ipa3_ctx->ipa_hw_type >= IPA_HW_v5_5) {
+			if (wigig_client > IPA_CLIENT_WIGIG3_CONS)
+				break;
+		}
+		else {
+			if (wigig_client > IPA_CLIENT_WIGIG4_CONS)
+				break;
+		}
 
 		ep_idx = ipa_get_ep_mapping( wigig_client );
 

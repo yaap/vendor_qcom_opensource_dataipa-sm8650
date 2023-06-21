@@ -605,7 +605,7 @@ static int __ipa_add_hdr(struct ipa_hdr_add *hdr, bool user,
 
 			/* return if adding the same name */
 			if (!strcmp(entry_t->name, entry->name) && (user == true)) {
-				IPAERR("IPACM Trying to add hdr %s len=%d, duplicate entry, return old one\n",
+				IPAERR_RL("IPACM Trying to add hdr %s len=%d, duplicate entry, return old one\n",
 					entry->name, entry->hdr_len);
 
 				/* return the original entry */

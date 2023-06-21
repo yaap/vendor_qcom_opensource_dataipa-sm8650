@@ -62,6 +62,10 @@ struct ipa_wdi_opt_dpath_info {
 	u32 q6_rtng_table_index;
 	u32 hdr_len;
 	atomic_t rsrv_req;
+	atomic_t is_opt_dp_cb_registered;
+	void *priv;
+	int ipa_ep_idx_tx, ipa_ep_idx_rx;
+	u32 ipa_pm_hdl;
 };
 
 struct ipa_wdi_context {
@@ -69,7 +73,6 @@ struct ipa_wdi_context {
 	struct completion wdi_completion;
 	struct mutex lock;
 	enum ipa_wdi_version wdi_version;
-	void *priv;
 	u8 is_smmu_enabled;
 	u32 tx_pipe_hdl;
 	u32 rx_pipe_hdl;
@@ -81,8 +84,17 @@ struct ipa_wdi_context {
 #ifdef IPA_WAN_MSG_IPv6_ADDR_GW_LEN
 	ipa_wdi_meter_notifier_cb wdi_notify;
 #endif
-	struct ipa_wdi_opt_dpath_info opt_dpath_info;
 };
+/**
+ * opt_dpath_info contains fn callbacks which are set by WLAN context and
+ * accessed by QMI context. To avoid race condition between these 2,
+ * callback info has to be mainitained as a separate global variable,
+ * outside of wdi context
+ *
+ */
+
+struct ipa_wdi_opt_dpath_info opt_dpath_info[IPA_WDI_INST_MAX];
+
 
 static struct ipa_wdi_context *ipa_wdi_ctx_list[IPA_WDI_INST_MAX];
 
@@ -246,7 +258,7 @@ int ipa_wdi_init_per_inst(struct ipa_wdi_init_in_params *in,
 
 	ipa_wdi_ctx_list[hdl]->inst_id = in->inst_id;
 	ipa_wdi_ctx_list[hdl]->wdi_version = in->wdi_version;
-	ipa_wdi_ctx_list[hdl]->priv = in->priv;
+	opt_dpath_info[hdl].priv = in->priv;
 	uc_ready_params.notify = in->notify;
 	uc_ready_params.priv = in->priv;
 
@@ -362,7 +374,7 @@ int ipa_wdi_reg_intf_per_inst(
 		sizeof(new_intf->netdev_name));
 	new_intf->hdr_len = in->hdr_info[0].hdr_len;
 	if (ipa3_ctx->ipa_wdi_opt_dpath)
-		ipa_wdi_ctx_list[in->hdl]->opt_dpath_info.hdr_len =
+		opt_dpath_info[in->hdl].hdr_len =
 			new_intf->hdr_len;
 	/* add partial header */
 	len = sizeof(struct ipa_ioc_add_hdr) + 2 * sizeof(struct ipa_hdr_add);
@@ -564,6 +576,7 @@ int ipa_wdi_conn_pipes_per_inst(struct ipa_wdi_conn_in_params *in,
 		goto fail_setup_sys_pipe;
 	}
 	IPA_WDI_DBG("PM handle Registered\n");
+	opt_dpath_info[in->hdl].ipa_pm_hdl = ipa_wdi_ctx_list[in->hdl]->ipa_pm_hdl;
 	if (ipa_wdi_ctx_list[in->hdl]->wdi_version >= IPA_WDI_3) {
 		if (ipa3_conn_wdi3_pipes(in, out, ipa_wdi_ctx_list[in->hdl]->wdi_notify)) {
 			IPA_WDI_ERR("fail to setup wdi pipes\n");
@@ -706,6 +719,26 @@ int ipa_wdi_conn_pipes_per_inst(struct ipa_wdi_conn_in_params *in,
 			IPA_WDI_DBG("tx uc db pa: 0x%pad\n", &out->tx_uc_db_pa);
 		}
 	IPA_WDI_DBG("conn pipes done\n");
+	}
+	if (ipa3_ctx->ipa_wdi_opt_dpath) {
+		if (ipa_wdi_ctx_list[in->hdl]->wdi_version >= IPA_WDI_3) {
+			if (IPA_CLIENT_IS_WLAN0_INSTANCE(ipa_wdi_ctx_list[in->hdl]->inst_id)) {
+				opt_dpath_info[in->hdl].ipa_ep_idx_rx =
+					ipa_get_ep_mapping(IPA_CLIENT_WLAN2_PROD);
+				opt_dpath_info[in->hdl].ipa_ep_idx_tx =
+					ipa_get_ep_mapping(IPA_CLIENT_WLAN2_CONS);
+			} else {
+				opt_dpath_info[in->hdl].ipa_ep_idx_rx =
+					ipa_get_ep_mapping(IPA_CLIENT_WLAN3_PROD);
+				opt_dpath_info[in->hdl].ipa_ep_idx_tx =
+					ipa_get_ep_mapping(IPA_CLIENT_WLAN4_CONS);
+			}
+		} else {
+			opt_dpath_info[in->hdl].ipa_ep_idx_rx =
+				ipa_get_ep_mapping(IPA_CLIENT_WLAN1_PROD);
+			opt_dpath_info[in->hdl].ipa_ep_idx_tx =
+				ipa_get_ep_mapping(IPA_CLIENT_WLAN1_CONS);
+		}
 	}
 
 	return 0;
@@ -1018,10 +1051,12 @@ int ipa_wdi_opt_dpath_register_flt_cb_per_inst(
 		return -EPERM;
 	}
 
-	ipa_wdi_ctx_list[hdl]->opt_dpath_info.flt_rsrv_cb = flt_rsrv_cb;
-	ipa_wdi_ctx_list[hdl]->opt_dpath_info.flt_rsrv_rel_cb = flt_rsrv_rel_cb;
-	ipa_wdi_ctx_list[hdl]->opt_dpath_info.flt_add_cb = flt_add_cb;
-	ipa_wdi_ctx_list[hdl]->opt_dpath_info.flt_rem_cb = flt_rem_cb;
+	opt_dpath_info[hdl].flt_rsrv_cb = flt_rsrv_cb;
+	opt_dpath_info[hdl].flt_rsrv_rel_cb = flt_rsrv_rel_cb;
+	opt_dpath_info[hdl].flt_add_cb = flt_add_cb;
+	opt_dpath_info[hdl].flt_rem_cb = flt_rem_cb;
+
+	atomic_set(&opt_dpath_info[hdl].is_opt_dp_cb_registered, 1);
 
 	IPADBG("wdi_opt_dpath_register_flt_cb: callbacks registered.\n");
 
@@ -1121,7 +1156,6 @@ int ipa_wdi_opt_dpath_rsrv_filter_req(
 		struct ipa_wlan_opt_dp_rsrv_filter_resp_msg_v01 *resp)
 {
 	int ret = 0, ret1 =0;
-	int ipa_ep_idx_tx, ipa_ep_idx_rx;
 	struct ipa_wdi_opt_dpath_flt_rsrv_cb_params rsrv_filter_req;
 	struct ipa_wlan_opt_dp_set_wlan_per_info_req_msg_v01 set_wlan_ep_req;
 
@@ -1129,14 +1163,7 @@ int ipa_wdi_opt_dpath_rsrv_filter_req(
 	memset(&rsrv_filter_req, 0, sizeof(struct ipa_wdi_opt_dpath_flt_rsrv_cb_params));
 	memset(&set_wlan_ep_req, 0, sizeof(struct ipa_wlan_opt_dp_set_wlan_per_info_req_msg_v01));
 
-	if (!ipa_wdi_ctx_list[0]) {
-		IPA_WDI_ERR("wdi ctx is not initialized.\n");
-		resp->resp.result = IPA_QMI_RESULT_FAILURE_V01;
-		resp->resp.error = IPA_QMI_ERR_INTERNAL_V01;
-		return -EPERM;
-	}
-
-	if (!ipa_wdi_ctx_list[0]->opt_dpath_info.flt_rsrv_cb)
+	if (!atomic_read(&opt_dpath_info[0].is_opt_dp_cb_registered))
 	{
 		IPAERR("filter reserve cb not registered");
 		resp->resp.result = IPA_QMI_RESULT_FAILURE_V01;
@@ -1144,37 +1171,24 @@ int ipa_wdi_opt_dpath_rsrv_filter_req(
 		return -EPERM;
 	}
 
-	if (ipa_wdi_ctx_list[0]->wdi_version >= IPA_WDI_3) {
-		if (IPA_CLIENT_IS_WLAN0_INSTANCE(ipa_wdi_ctx_list[0]->inst_id)) {
-			ipa_ep_idx_rx = ipa_get_ep_mapping(IPA_CLIENT_WLAN2_PROD);
-			ipa_ep_idx_tx = ipa_get_ep_mapping(IPA_CLIENT_WLAN2_CONS);
-		} else {
-			ipa_ep_idx_rx = ipa_get_ep_mapping(IPA_CLIENT_WLAN3_PROD);
-			ipa_ep_idx_tx = ipa_get_ep_mapping(IPA_CLIENT_WLAN4_CONS);
-		}
-	} else {
-		ipa_ep_idx_rx = ipa_get_ep_mapping(IPA_CLIENT_WLAN1_PROD);
-		ipa_ep_idx_tx = ipa_get_ep_mapping(IPA_CLIENT_WLAN1_CONS);
-	}
-
-	if (ipa_ep_idx_tx <= 0 || ipa_ep_idx_rx <= 0) {
+	if (opt_dpath_info[0].ipa_ep_idx_tx <= 0 || opt_dpath_info[0].ipa_ep_idx_rx <= 0) {
 		IPA_WDI_ERR("Either TX/RX ep is not configured. \n");
 		resp->resp.result = IPA_QMI_RESULT_FAILURE_V01;
 		resp->resp.error = IPA_QMI_ERR_INTERNAL_V01;
 		return -EPERM;
 	}
 
-	IPADBG("ep_tx = %d\n", ipa_ep_idx_tx);
-	IPADBG("ep_rx = %d\n", ipa_ep_idx_rx);
+	IPADBG("ep_tx = %d\n", opt_dpath_info[0].ipa_ep_idx_tx);
+	IPADBG("ep_rx = %d\n", opt_dpath_info[0].ipa_ep_idx_rx);
 
-	set_wlan_ep_req.dest_wlan_endp_id = ipa_ep_idx_tx;
-	set_wlan_ep_req.src_wlan_endp_id = ipa_ep_idx_rx;
+	set_wlan_ep_req.dest_wlan_endp_id = opt_dpath_info[0].ipa_ep_idx_tx;
+	set_wlan_ep_req.src_wlan_endp_id = opt_dpath_info[0].ipa_ep_idx_rx;
 	set_wlan_ep_req.dest_apps_endp_id = ipa_get_ep_mapping(IPA_CLIENT_APPS_LAN_CONS);
-	set_wlan_ep_req.hdr_len = ((ipa_wdi_ctx_list[0]->opt_dpath_info.hdr_len) ?
-			ipa_wdi_ctx_list[0]->opt_dpath_info.hdr_len :
+	set_wlan_ep_req.hdr_len = ((opt_dpath_info[0].hdr_len) ?
+			opt_dpath_info[0].hdr_len :
 			ETH_HLEN);
 
-	ret = ipa_pm_activate_sync(ipa_wdi_ctx_list[0]->ipa_pm_hdl);
+	ret = ipa_pm_activate_sync(opt_dpath_info[0].ipa_pm_hdl);
 	if (ret) {
 		IPA_WDI_DBG("fail to activate ipa pm\n");
 		resp->resp.result = IPA_QMI_RESULT_FAILURE_V01;
@@ -1188,20 +1202,21 @@ int ipa_wdi_opt_dpath_rsrv_filter_req(
 	rsrv_filter_req.num_filters = req->num_filters;
 	rsrv_filter_req.rsrv_timeout = req->timeout_val_ms;
 	ret =
-		ipa_wdi_ctx_list[0]->opt_dpath_info.flt_rsrv_cb(
-			ipa_wdi_ctx_list[0]->priv, &rsrv_filter_req);
+		opt_dpath_info[0].flt_rsrv_cb(
+			opt_dpath_info[0].priv, &rsrv_filter_req);
 
 	if (!ret) {
 
-		atomic_set(&ipa_wdi_ctx_list[0]->opt_dpath_info.rsrv_req, 1);
+		atomic_set(&opt_dpath_info[0].rsrv_req, 1);
 
-		ipa_wdi_ctx_list[0]->opt_dpath_info.q6_rtng_table_index =
+		opt_dpath_info[0].q6_rtng_table_index =
 			req->q6_rtng_table_index;
 
-		ipa3_enable_wdi3_opt_dpath(ipa_ep_idx_rx, ipa_ep_idx_tx,
-			ipa_wdi_ctx_list[0]->opt_dpath_info.q6_rtng_table_index);
+		ipa3_enable_wdi3_opt_dpath(opt_dpath_info[0].ipa_ep_idx_rx,
+			opt_dpath_info[0].ipa_ep_idx_tx,
+			opt_dpath_info[0].q6_rtng_table_index);
 	} else {
-		ret1 = ipa_pm_deferred_deactivate(ipa_wdi_ctx_list[0]->ipa_pm_hdl);
+		ret1 = ipa_pm_deferred_deactivate(opt_dpath_info[0].ipa_pm_hdl);
 		if (ret1) {
 			IPA_WDI_DBG("fail to deactivate ipa pm\n");
 		}
@@ -1237,15 +1252,7 @@ int ipa_wdi_opt_dpath_add_filter_req(
 	memset(ind, 0, sizeof(struct ipa_wlan_opt_dp_add_filter_complt_ind_msg_v01));
 	memset(&flt_add_req, 0, sizeof(struct ipa_wdi_opt_dpath_flt_add_cb_params));
 
-	if (!ipa_wdi_ctx_list[0]) {
-		IPA_WDI_ERR("wdi ctx is not initialized.\n");
-		ind->filter_add_status.result = IPA_QMI_RESULT_FAILURE_V01;
-		ind->filter_add_status.error = IPA_QMI_ERR_INTERNAL_V01;
-		ind->filter_idx = req->filter_idx;
-		return -EPERM;
-	}
-
-	if (!ipa_wdi_ctx_list[0]->opt_dpath_info.flt_add_cb) {
+	if (!atomic_read(&opt_dpath_info[0].is_opt_dp_cb_registered)) {
 		IPAERR("filter add cb not registered");
 		ind->filter_add_status.result = IPA_QMI_RESULT_FAILURE_V01;
 		ind->filter_add_status.error = IPA_QMI_ERR_INTERNAL_V01;
@@ -1289,8 +1296,8 @@ int ipa_wdi_opt_dpath_add_filter_req(
 	}
 
 	ret =
-		ipa_wdi_ctx_list[0]->opt_dpath_info.flt_add_cb
-			(ipa_wdi_ctx_list[0]->priv, &flt_add_req);
+		opt_dpath_info[0].flt_add_cb
+			(opt_dpath_info[0].priv, &flt_add_req);
 
 	ind->filter_idx = req->filter_idx;
 	ind->filter_handle_valid = true;
@@ -1324,16 +1331,7 @@ int ipa_wdi_opt_dpath_remove_filter_req(
 	memset(ind, 0, sizeof(struct ipa_wlan_opt_dp_remove_filter_complt_ind_msg_v01));
 	memset(&flt_rem_req, 0, sizeof(struct ipa_wdi_opt_dpath_flt_rem_cb_params));
 
-
-	if (!ipa_wdi_ctx_list[0]) {
-		IPA_WDI_ERR("wdi ctx is not initialized.\n");
-		ind->filter_removal_status.result = IPA_QMI_RESULT_SUCCESS_V01;
-		ind->filter_removal_status.error = IPA_QMI_ERR_NONE_V01;
-		ind->filter_idx = req->filter_idx;
-		return -EPERM;
-	}
-
-	if (!ipa_wdi_ctx_list[0]->opt_dpath_info.flt_rem_cb)
+	if (!atomic_read(&opt_dpath_info[0].is_opt_dp_cb_registered))
 	{
 		IPAERR("filter remove cb not registered");
 		ind->filter_removal_status.result = IPA_QMI_RESULT_SUCCESS_V01;
@@ -1346,8 +1344,8 @@ int ipa_wdi_opt_dpath_remove_filter_req(
 	flt_rem_req.hdl_info[0] = req->filter_handle;
 
 	ret =
-		ipa_wdi_ctx_list[0]->opt_dpath_info.flt_rem_cb
-			(ipa_wdi_ctx_list[0]->priv, &flt_rem_req);
+		opt_dpath_info[0].flt_rem_cb
+			(opt_dpath_info[0].priv, &flt_rem_req);
 
 	ind->filter_idx = req->filter_idx;
 	ind->filter_removal_status.result = ret;
@@ -1375,52 +1373,34 @@ int ipa_wdi_opt_dpath_remove_all_filter_req(
 			struct ipa_wlan_opt_dp_remove_all_filter_resp_msg_v01 *resp)
 {
 	int ret = 0;
-	int ipa_ep_idx_rx, ipa_ep_idx_tx;
 
 	memset(resp, 0, sizeof(struct ipa_wlan_opt_dp_remove_all_filter_resp_msg_v01));
 
-	if (!ipa_wdi_ctx_list[0]) {
-		IPA_WDI_ERR("wdi ctx is not initialized.\n");
-		return -EPERM;
-	}
-
-	if (!ipa_wdi_ctx_list[0]->opt_dpath_info.flt_rsrv_rel_cb)
+	if (!atomic_read(&opt_dpath_info[0].is_opt_dp_cb_registered))
 	{
 		IPAERR("filter release cb not registered");
 		return -EPERM;
 	}
 
-	if (!atomic_read(&ipa_wdi_ctx_list[0]->opt_dpath_info.rsrv_req))
+	if (!atomic_read(&opt_dpath_info[0].rsrv_req))
 	{
 		IPAERR("Reservation request not sent. IGNORE");
 		return 0;
 	}
 
-	atomic_set(&ipa_wdi_ctx_list[0]->opt_dpath_info.rsrv_req, 0);
+	atomic_set(&opt_dpath_info[0].rsrv_req, 0);
 
 	ret =
-		ipa_wdi_ctx_list[0]->opt_dpath_info.flt_rsrv_rel_cb(
-			ipa_wdi_ctx_list[0]->priv);
+		opt_dpath_info[0].flt_rsrv_rel_cb(
+			opt_dpath_info[0].priv);
 
-	if (ipa_wdi_ctx_list[0]->wdi_version >= IPA_WDI_3) {
-		if (IPA_CLIENT_IS_WLAN0_INSTANCE(ipa_wdi_ctx_list[0]->inst_id)) {
-			ipa_ep_idx_rx = ipa_get_ep_mapping(IPA_CLIENT_WLAN2_PROD);
-			ipa_ep_idx_tx = ipa_get_ep_mapping(IPA_CLIENT_WLAN2_CONS);
-		} else {
-			ipa_ep_idx_rx = ipa_get_ep_mapping(IPA_CLIENT_WLAN3_PROD);
-			ipa_ep_idx_tx = ipa_get_ep_mapping(IPA_CLIENT_WLAN4_CONS);
-		}
-	} else {
-		ipa_ep_idx_rx = ipa_get_ep_mapping(IPA_CLIENT_WLAN1_PROD);
-		ipa_ep_idx_tx = ipa_get_ep_mapping(IPA_CLIENT_WLAN1_CONS);
-	}
-
-	if (ipa_ep_idx_rx <= 0 || ipa_ep_idx_tx <= 0) {
+	if (opt_dpath_info[0].ipa_ep_idx_rx <= 0 || opt_dpath_info[0].ipa_ep_idx_tx <= 0) {
 		IPA_WDI_ERR("Either RX ep or TX ep is not configured. \n");
 		return 0;
 	}
 
-	ipa3_disable_wdi3_opt_dpath(ipa_ep_idx_rx, ipa_ep_idx_tx);
+	ipa3_disable_wdi3_opt_dpath(opt_dpath_info[0].ipa_ep_idx_rx,
+	opt_dpath_info[0].ipa_ep_idx_tx);
 
 	resp->resp.result = ret;
 	resp->resp.error = IPA_QMI_ERR_NONE_V01;
@@ -1470,6 +1450,9 @@ int ipa_wdi_cleanup_per_inst(ipa_wdi_hdl_t hdl)
 	}
 	mutex_destroy(&ipa_wdi_ctx_list[hdl]->lock);
 	kfree(ipa_wdi_ctx_list[hdl]);
+	atomic_set(&opt_dpath_info[hdl].is_opt_dp_cb_registered, 0);
+	opt_dpath_info[0].ipa_ep_idx_rx = 0;
+	opt_dpath_info[0].ipa_ep_idx_tx = 0;
 	ipa_wdi_ctx_list[hdl] = NULL;
 	return 0;
 }
