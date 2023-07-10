@@ -171,6 +171,21 @@ def define_modules(target, variant):
                     "drivers/platform/msm/ipa/ipa_clients/rndis_ipa.c",
                 ],
             },
+            "CONFIG_IPA_UT": {
+                True: [
+                    "drivers/platform/msm/ipa/test/ipa_ut_framework.c",
+                    "drivers/platform/msm/ipa/test/ipa_ut_framework.h",
+                    "drivers/platform/msm/ipa/test/ipa_ut_i.h",
+                    "drivers/platform/msm/ipa/test/ipa_ut_suite_list.h",
+                    "drivers/platform/msm/ipa/test/ipa_test_example.c",
+                    "drivers/platform/msm/ipa/test/ipa_test_mhi.c",
+                    "drivers/platform/msm/ipa/test/ipa_test_dma.c",
+                    "drivers/platform/msm/ipa/test/ipa_test_hw_stats.c",
+                    "drivers/platform/msm/ipa/test/ipa_pm_ut.c",
+                    "drivers/platform/msm/ipa/test/ipa_test_wdi3.c",
+                    "drivers/platform/msm/ipa/test/ipa_test_ntn.c",
+                ],
+            },
         },
         local_defines = [
             "GSI_TRACE_INCLUDE_PATH={}/drivers/platform/msm/gsi".format(include_base),
