@@ -1933,6 +1933,7 @@ fail_wq3:
 fail_wq2:
 	destroy_workqueue(ep->sys->wq);
 fail_wq:
+	*clnt_hdl = -1;
 	kfree(ep->sys);
 	memset(&ipa3_ctx->ep[ipa_ep_idx], 0, sizeof(struct ipa3_ep_context));
 fail_and_disable_clocks:
