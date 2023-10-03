@@ -15,7 +15,8 @@ endif
 ifeq ($(call is-board-platform-in-list, $(GSI_DLKM_PLATFORMS_LIST)),true)
 #Make file to create GSI DLKM
 
-DLKM_DIR := $(TOP)/device/qcom/common/dlkm
+BOARD_COMMON_DIR ?= device/qcom/common
+DLKM_DIR := $(TOP)/$(BOARD_COMMON_DIR)/dlkm
 LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
