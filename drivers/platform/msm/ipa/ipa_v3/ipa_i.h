@@ -1568,6 +1568,7 @@ enum ipa3_platform_type {
 	IPA_PLAT_TYPE_MDM	= 0,
 	IPA_PLAT_TYPE_MSM	= 1,
 	IPA_PLAT_TYPE_APQ	= 2,
+	IPA_PLAT_TYPE_XR	= 3,
 };
 
 enum ipa3_config_this_ep {
@@ -2426,6 +2427,7 @@ struct ipa3_context {
 	bool ipa_wdi2_over_gsi;
 	bool ipa_wdi3_over_gsi;
 	bool ipa_wdi_opt_dpath;
+	bool ipa_xr_wdi_flt_rsv_status;
 	u8 rtp_stream_id_cnt;
 	bool ipa_endp_delay_wa;
 	bool lan_coal_enable;
