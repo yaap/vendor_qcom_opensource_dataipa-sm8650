@@ -46,6 +46,7 @@
 #ifdef CONFIG_IPA_RTP
 #include "ipa_rtp_genl.h"
 #endif
+#include <linux/dma-buf.h>
 
 #define IPA_DEV_NAME_MAX_LEN 15
 #define DRV_NAME "ipa"
@@ -572,6 +573,11 @@ enum {
 #define MBOX_TOUT_MS 100
 
 #define IPA_RULE_CNT_MAX 512
+
+/* XR-IPA uC temp buffers sizes */
+#define TEMP_BUFF_SIZE	0x300000
+/* XR-IPA uC no. of temp buffers */
+#define NO_OF_BUFFS	0x04
 
 /* miscellaneous for rmnet_ipa and qmi_service */
 enum ipa_type_mode {
@@ -3831,4 +3837,18 @@ int ipa3_update_apps_per_stats(enum ipa_per_stats_type_e stats_type, uint32_t da
 int ipa3_update_client_holb_per_stats(enum ipa_per_stats_type_e stats_type, uint32_t data);
 int ipa3_update_dma_per_stats(enum ipa_per_stats_type_e stats_type, uint32_t data);
 
+/* XR-IPA API's */
+#ifdef CONFIG_IPA_RTP
+int ipa3_uc_send_tuple_info_cmd(struct traffic_tuple_info *data);
+int ipa3_alloc_temp_buffs_to_uc(unsigned int size, unsigned int no_of_buffs);
+int ipa3_map_buff_to_device_addr(struct map_buffer *map_buffs);
+int ipa3_unmap_buff_from_device_addr(struct unmap_buffer *unmap_buffs);
+int ipa3_send_bitstream_buff_info(struct bitstream_buffers *data);
+int ipa3_tuple_info_cmd_to_wlan_uc(struct traffic_tuple_info *req, u32 stream_id);
+int ipa3_uc_send_remove_stream_cmd(struct remove_bitstream_buffers *data);
+int ipa3_create_hfi_send_uc(void);
+int ipa3_allocate_uc_pipes_er_tr_send_to_uc(void);
+void ipa3_free_uc_temp_buffs(unsigned int no_of_buffs);
+void ipa3_free_uc_pipes_er_tr(void);
+#endif
 #endif /* _IPA3_I_H_ */

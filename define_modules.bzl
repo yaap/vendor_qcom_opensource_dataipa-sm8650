@@ -211,6 +211,7 @@ def define_modules(target, variant):
                 True: [
                     "drivers/platform/msm/ipa/ipa_v3/ipa_rtp_genl.h",
                     "drivers/platform/msm/ipa/ipa_v3/ipa_rtp_genl.c",
+                    "drivers/platform/msm/ipa/ipa_v3/ipa_uc_rtp.c",
                 ],
             },
         },
