@@ -259,6 +259,8 @@ enum {
 
 
 /* Function Prototypes */
+int ipa3_install_rtp_hdr_proc_rt_flt_rules(struct traffic_tuple_info *tuple_info, u32 stream_id);
+int ipa3_delete_rtp_hdr_proc_rt_flt_rules(u32 stream_id);
 
 /*
  * This handler will be invoked when IPA C2 sends TUPLE
