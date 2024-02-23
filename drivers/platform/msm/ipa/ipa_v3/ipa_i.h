@@ -2,7 +2,7 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  *
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _IPA3_I_H_
@@ -43,6 +43,9 @@
 #include <linux/rmnet_ipa_fd_ioctl.h>
 #include "ipa_uc_holb_monitor.h"
 #include <soc/qcom/minidump.h>
+#ifdef CONFIG_IPA_RTP
+#include "ipa_rtp_genl.h"
+#endif
 
 #define IPA_DEV_NAME_MAX_LEN 15
 #define DRV_NAME "ipa"
@@ -2423,6 +2426,7 @@ struct ipa3_context {
 	bool ipa_wdi2_over_gsi;
 	bool ipa_wdi3_over_gsi;
 	bool ipa_wdi_opt_dpath;
+	u8 rtp_stream_id_cnt;
 	bool ipa_endp_delay_wa;
 	bool lan_coal_enable;
 	bool ipa_fltrt_not_hashable;

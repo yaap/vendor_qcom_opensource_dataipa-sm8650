@@ -207,6 +207,12 @@ def define_modules(target, variant):
                     "drivers/platform/msm/ipa/test/ipa_test_ntn.c",
                 ],
             },
+            "CONFIG_ARCH_NIOBE": {
+                True: [
+                    "drivers/platform/msm/ipa/ipa_v3/ipa_rtp_genl.h",
+                    "drivers/platform/msm/ipa/ipa_v3/ipa_rtp_genl.c",
+                ],
+            },
         },
         local_defines = [
             "GSI_TRACE_INCLUDE_PATH={}/drivers/platform/msm/gsi".format(include_base),
