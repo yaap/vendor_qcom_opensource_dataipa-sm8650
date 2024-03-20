@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _UAPI_MSM_IPA_H_
@@ -523,9 +523,21 @@ enum ipa_client_type {
 
 	IPA_CLIENT_Q6_DL_NLO_DATA_XLAT_PROD     = 132,
 	IPA_CLIENT_IPSEC_ENCAP_ERR_CONS		= 133,
+
+	/* RESERVED PROD			= 134, */
+	IPA_CLIENT_UC_RTP1_CONS = 135,
+
+	/* RESERVED PROD			= 136, */
+	IPA_CLIENT_UC_RTP2_CONS = 137,
+
+	/* RESERVED PROD			= 138, */
+	IPA_CLIENT_UC_RTP3_CONS = 139,
+
+	/* RESERVED PROD			= 140, */
+	IPA_CLIENT_UC_RTP4_CONS = 141,
 };
 
-#define IPA_CLIENT_MAX (IPA_CLIENT_IPSEC_ENCAP_ERR_CONS + 1)
+#define IPA_CLIENT_MAX (IPA_CLIENT_UC_RTP4_CONS + 1)
 
 #define IPA_CLIENT_WLAN2_PROD IPA_CLIENT_A5_WLAN_AMPDU_PROD
 #define IPA_CLIENT_Q6_DL_NLO_DATA_PROD IPA_CLIENT_Q6_DL_NLO_DATA_PROD
