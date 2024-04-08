@@ -7556,7 +7556,8 @@ static void ipa3_freeze_clock_vote_and_notify_modem(void)
 	int res;
 	struct ipa_active_client_logging_info log_info;
 
-	if (ipa3_ctx->platform_type == IPA_PLAT_TYPE_APQ) {
+	if (ipa3_ctx->platform_type == IPA_PLAT_TYPE_APQ ||
+		ipa3_ctx->platform_type == IPA_PLAT_TYPE_XR) {
 		IPADBG("Ignore smp2p on APQ platform\n");
 		return;
 	}
