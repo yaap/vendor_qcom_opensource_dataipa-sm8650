@@ -578,6 +578,8 @@ enum {
 #define TEMP_BUFF_SIZE	0x300000
 /* XR-IPA uC no. of temp buffers */
 #define NO_OF_BUFFS	0x04
+/* Max number of RTP streams supported */
+#define MAX_STREAMS 4
 
 /* miscellaneous for rmnet_ipa and qmi_service */
 enum ipa_type_mode {
@@ -901,6 +903,7 @@ struct ipa3_hdr_proc_ctx_offset_entry {
  * @type: header processing context type
  * @l2tp_params: L2TP parameters
  * @generic_params: generic proc_ctx params
+ * @rtp_params: ipa rtp proc_ctx params
  * @offset_entry: entry's offset
  * @hdr: the header
  * @cookie: cookie used for validity check
@@ -916,6 +919,7 @@ struct ipa3_hdr_proc_ctx_entry {
 	struct ipa_l2tp_hdr_proc_ctx_params l2tp_params;
 	struct ipa_eogre_hdr_proc_ctx_params eogre_params;
 	struct ipa_eth_II_to_eth_II_ex_procparams generic_params;
+	struct ipa_rtp_hdr_proc_ctx_params rtp_params;
 	struct ipa3_hdr_proc_ctx_offset_entry *offset_entry;
 	struct ipa3_hdr_entry *hdr;
 	u32 ref_cnt;
@@ -1123,6 +1127,7 @@ struct ipa3_ep_context {
 	u32 dflt_flt6_rule_hdl;
 	u32 dl_flt4_rule_hdl;
 	u32 dl_flt6_rule_hdl;
+	u32 rtp_flt4_rule_hdls[MAX_STREAMS];
 	bool skip_ep_cfg;
 	bool keep_ipa_awake;
 	struct ipa3_wlan_stats wstats;
@@ -2435,6 +2440,10 @@ struct ipa3_context {
 	bool ipa_wdi_opt_dpath;
 	bool ipa_xr_wdi_flt_rsv_status;
 	u8 rtp_stream_id_cnt;
+	u32 rtp_proc_hdls[MAX_STREAMS];
+	u32 rtp_rt4_tbl_hdls[MAX_STREAMS];
+	u32 rtp_rt4_tbl_idxs[MAX_STREAMS];
+	u32 rtp_rt4_rule_hdls[MAX_STREAMS];
 	bool ipa_endp_delay_wa;
 	bool lan_coal_enable;
 	bool ipa_fltrt_not_hashable;
