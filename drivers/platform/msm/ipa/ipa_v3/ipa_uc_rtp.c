@@ -745,7 +745,7 @@ int ipa3_smmu_map_buff(uint64_t bitstream_buffer_fd,
 		goto map_table_free;
 	}
 
-	attachment = dma_buf_attach(dbuff, ipa3_ctx->pdev);
+	attachment = dma_buf_attach(dbuff, ipa3_ctx->rtp_pdev);
 	if (IS_ERR_OR_NULL(attachment)) {
 		IPAERR("dma buf attachment failed\n");
 		err = -EFAULT;
@@ -775,7 +775,7 @@ int ipa3_smmu_map_buff(uint64_t bitstream_buffer_fd,
 		goto dma_buff_det;
 	}
 
-	attachment = dma_buf_attach(dbuff, ipa3_ctx->pdev);
+	attachment = dma_buf_attach(dbuff, ipa3_ctx->rtp_pdev);
 	if (IS_ERR_OR_NULL(attachment)) {
 		IPAERR("dma buf attachment failed.\n");
 		err = -EFAULT;

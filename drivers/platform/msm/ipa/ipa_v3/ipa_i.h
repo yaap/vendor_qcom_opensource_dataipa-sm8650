@@ -2013,6 +2013,7 @@ enum ipa_smmu_cb_type {
 	IPA_SMMU_CB_11AD,
 	IPA_SMMU_CB_ETH,
 	IPA_SMMU_CB_ETH1,
+	IPA_SMMU_CB_RTP,
 	IPA_SMMU_CB_MAX
 };
 
@@ -2460,6 +2461,7 @@ struct ipa3_context {
 	struct platform_device *master_pdev;
 	struct device *pdev;
 	struct device *uc_pdev;
+	struct device *rtp_pdev;
 	spinlock_t idr_lock;
 	u32 enable_clock_scaling;
 	u32 enable_napi_chain;
