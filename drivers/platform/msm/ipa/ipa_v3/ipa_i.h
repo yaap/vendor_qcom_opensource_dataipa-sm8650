@@ -3863,5 +3863,6 @@ int ipa3_create_hfi_send_uc(void);
 int ipa3_allocate_uc_pipes_er_tr_send_to_uc(void);
 void ipa3_free_uc_temp_buffs(unsigned int no_of_buffs);
 void ipa3_free_uc_pipes_er_tr(void);
+int ipa3_uc_send_add_bitstream_buffers_cmd(struct bitstream_buffers_to_uc *data);
 #endif
 #endif /* _IPA3_I_H_ */
