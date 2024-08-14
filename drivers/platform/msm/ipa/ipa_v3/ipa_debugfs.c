@@ -3669,7 +3669,8 @@ static ssize_t ipa_xr_add_flt_to_wlan(struct file *file,
 		token = strsep(&sptr, " ");
 		if (!token)
 			return -EINVAL;
-		if (kstrtou8(token, 0, &prot[i]) || prot[i] != IPPROTO_UDP)
+		if (kstrtou8(token, 0, &prot[i]) ||
+				!(prot[i] == IPPROTO_UDP || prot[i] == IPPROTO_TCP))
 			return -EINVAL;
 	}
 
