@@ -113,7 +113,7 @@ struct rtp_pipe_setup_cmd_data {
 
 struct hfi_queue_info {
 	u64 hfi_queue_addr;
-	u32 hfi_queue_size;
+	u32 hfi_queue_payload_size;
 	u64 queue_header_start_addr;
 	u64 queue_payload_start_addr;
 } __packed;
@@ -1038,6 +1038,7 @@ int ipa3_create_hfi_send_uc(void)
 	struct hfi_queue_info data;
 	dma_addr_t hfi_queue_addr = 0;
 	struct ipa_smmu_cb_ctx *cb = NULL;
+	struct synx_hw_fence_hfi_queue_header *hfi_queue_payload_vptr = NULL;
 
 	snprintf(synx_session_name, MAX_SYNX_FENCE_SESSION_NAME, "ipa synx fence");
 	queue_desc.vaddr = NULL;
@@ -1071,11 +1072,15 @@ int ipa3_create_hfi_send_uc(void)
 
 	hfi_queue_addr = queue_desc.dev_addr;
 	data.hfi_queue_addr = hfi_queue_addr;
-	data.hfi_queue_size = queue_desc.size;
 	data.queue_header_start_addr = hfi_queue_addr +
 			sizeof(struct synx_hw_fence_hfi_queue_table_header);
 	data.queue_payload_start_addr = data.queue_header_start_addr +
 			sizeof(struct synx_hw_fence_hfi_queue_header);
+	hfi_queue_payload_vptr = (struct synx_hw_fence_hfi_queue_header *)(queue_desc.vaddr +
+				sizeof(struct synx_hw_fence_hfi_queue_table_header));
+	data.hfi_queue_payload_size = hfi_queue_payload_vptr->queue_size;
+	IPADBG("hfi queue payload vptr is 0x%x\n", hfi_queue_payload_vptr);
+	IPADBG("hfi queue payload size is 0x%x\n", data.hfi_queue_payload_size);
 	res = ipa3_uc_send_hfi_cmd(&data);
 	return res;
 }
