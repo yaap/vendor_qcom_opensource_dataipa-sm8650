@@ -579,7 +579,7 @@ enum {
 /* XR-IPA uC no. of temp buffers */
 #define NO_OF_BUFFS	0x04
 /* Max number of RTP streams supported */
-#define MAX_STREAMS 4
+#define MAX_STREAMS 2
 
 /* miscellaneous for rmnet_ipa and qmi_service */
 enum ipa_type_mode {
@@ -2439,7 +2439,8 @@ struct ipa3_context {
 	bool ipa_wdi2_over_gsi;
 	bool ipa_wdi3_over_gsi;
 	bool ipa_wdi_opt_dpath;
-	bool ipa_xr_wdi_flt_rsv_status;
+	atomic_t ipa_xr_wdi_flt_rsv_status;
+	struct completion ipa_xr_wdi_flt_rsrv_success;
 	u8 rtp_stream_id_cnt;
 	u32 rtp_proc_hdls[MAX_STREAMS];
 	u32 rtp_rt4_tbl_hdls[MAX_STREAMS];

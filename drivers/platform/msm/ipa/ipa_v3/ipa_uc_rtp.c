@@ -58,24 +58,6 @@ enum ipa3_cpu_2_hw_rtp_commands {
 		FEATURE_ENUM_VAL(IPA_HW_FEATURE_RTP, 11),
 };
 
-struct bitstream_buffer_info_to_uc {
-	uint8_t stream_id;
-	uint16_t fence_id;
-	uint8_t reserved;
-	u64 buff_addr;
-	u32 buff_fd;
-	u32 buff_size;
-	u64 meta_buff_addr;
-	u32 meta_buff_fd;
-	u32 meta_buff_size;
-} __packed;
-
-struct bitstream_buffers_to_uc {
-	uint16_t buff_cnt;
-	uint16_t cookie;
-	struct bitstream_buffer_info_to_uc bs_info[MAX_BUFF];
-} __packed;
-
 struct dma_address_map_table {
 	struct dma_buf *dma_buf_list[2];
 	struct dma_buf_attachment *attachment[2];
@@ -222,9 +204,8 @@ int ipa3_tuple_info_cmd_to_wlan_uc(struct traffic_tuple_info *req, u32 stream_id
 		return -EINVAL;
 	}
 
-	if (!ipa3_ctx->ipa_xr_wdi_flt_rsv_status) {
+	if (!atomic_read(&ipa3_ctx->ipa_xr_wdi_flt_rsv_status)) {
 		result = ipa_xr_wdi_opt_dpath_rsrv_filter_req();
-		ipa3_ctx->ipa_xr_wdi_flt_rsv_status = !result;
 		if (result) {
 			IPAERR("filter reservation failed at WLAN %d\n", result);
 			return result;
@@ -264,17 +245,19 @@ int ipa3_tuple_info_cmd_to_wlan_uc(struct traffic_tuple_info *req, u32 stream_id
 			flt_add_req.flt_info[0].ipv6_addr.ipv6_daddr[3]);
 	}
 
+	result = ipa3_uc_send_tuple_info_cmd(req);
+	if (result) {
+		IPAERR("Fail to send tuple info cmd to uc\n");
+		return -EPERM;
+	}
+	else
+		IPADBG("send tuple info cmd to uc succeeded\n");
+
 	result = ipa_xr_wdi_opt_dpath_add_filter_req(&flt_add_req, stream_id);
 	if (result) {
 		IPAERR("Fail to send tuple info cmd to wlan\n");
 		return -EPERM;
 	}
-
-	result = ipa3_uc_send_tuple_info_cmd(req);
-	if (result)
-		IPAERR("Fail to send tuple info cmd to uc\n");
-	else
-		IPADBG("send tuple info cmd to uc succeeded\n");
 
 	return result;
 }
@@ -291,8 +274,10 @@ int ipa3_uc_send_remove_stream_cmd(struct remove_bitstream_buffers *data)
 	}
 
 	result = ipa_xr_wdi_opt_dpath_remove_filter_req(data->stream_id);
-	if (result)
+	if (result) {
 		IPAERR("Failed to remove wlan filter of stream ID %d\n", data->stream_id);
+		return result;
+	}
 
 	cmd.size = sizeof(*cmd_data);
 	cmd.base = dma_alloc_coherent(ipa3_ctx->uc_pdev, cmd.size,
