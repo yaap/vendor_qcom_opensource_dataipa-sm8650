@@ -8279,9 +8279,7 @@ static int ipa3_post_init(const struct ipa3_plat_drv_res *resource_p,
 
 #ifdef CONFIG_IPA_RTP
 	if (ipa3_ctx->platform_type == IPA_PLAT_TYPE_XR) {
-		/* uC is getting loaded through XBL here */
-		ipa3_ctx->uc_ctx.uc_inited = true;
-		ipa3_ctx->uc_ctx.uc_loaded = true;
+
 		IPA_ACTIVE_CLIENTS_INC_SIMPLE();
 		result = ipa3_alloc_temp_buffs_to_uc(TEMP_BUFF_SIZE, NO_OF_BUFFS);
 		if (result) {
