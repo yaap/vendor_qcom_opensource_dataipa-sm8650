@@ -2,7 +2,7 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  *
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _IPA3_I_H_
@@ -397,6 +397,8 @@ enum {
 #define IPA_GSI_CHANNEL_HALT_MIN_SLEEP 5000
 #define IPA_GSI_CHANNEL_HALT_MAX_SLEEP 10000
 #define IPA_GSI_CHANNEL_HALT_MAX_TRY 10
+
+#define XR_IPA_UC_INIT_TIMEOUT_MSEC 100
 
 /* round addresses for closes page per SMMU requirements */
 #define IPA_SMMU_ROUND_TO_PAGE(iova, pa, size, iova_p, pa_p, size_p) \
@@ -1127,7 +1129,6 @@ struct ipa3_ep_context {
 	u32 dflt_flt6_rule_hdl;
 	u32 dl_flt4_rule_hdl;
 	u32 dl_flt6_rule_hdl;
-	u32 rtp_flt4_rule_hdls[MAX_STREAMS];
 	bool skip_ep_cfg;
 	bool keep_ipa_awake;
 	struct ipa3_wlan_stats wstats;
@@ -2284,6 +2285,7 @@ enum ipa_per_usb_enum_type_e {
  * @ip6_flt_tbl_lcl: where ip6 flt tables reside 1-local; 0-system
  * @power_mgmt_wq: workqueue for power management
  * @transport_power_mgmt_wq: workqueue transport related power management
+ * @xr_uc_init_wq: workqueue for uc initializations
  * @tag_process_before_gating: indicates whether to start tag process before
  *  gating IPA clocks
  * @transport_pm: transport power management related information
@@ -2412,6 +2414,7 @@ struct ipa3_context {
 	struct workqueue_struct *transport_power_mgmt_wq;
 	bool tag_process_before_gating;
 	struct ipa3_transport_pm transport_pm;
+	struct workqueue_struct *xr_uc_init_wq;
 	unsigned long gsi_evt_comm_hdl;
 	u32 gsi_evt_comm_ring_rem;
 	u32 clnt_hdl_cmd;
@@ -2446,6 +2449,7 @@ struct ipa3_context {
 	u32 rtp_rt4_tbl_hdls[MAX_STREAMS];
 	u32 rtp_rt4_tbl_idxs[MAX_STREAMS];
 	u32 rtp_rt4_rule_hdls[MAX_STREAMS];
+	u32 rtp_flt4_rule_hdls[MAX_STREAMS];
 	bool ipa_endp_delay_wa;
 	bool lan_coal_enable;
 	bool ipa_fltrt_not_hashable;
@@ -2539,6 +2543,7 @@ struct ipa3_context {
 	struct ipa3_tsp_ctx tsp;
 #endif
 	atomic_t ipa_clk_vote;
+	bool gsi_status;
 
 	int (*client_lock_unlock[IPA_MAX_CLNT])(bool is_lock);
 
@@ -2639,6 +2644,7 @@ struct ipa3_context {
 	struct ipa3_page_recycle_stats prev_low_lat_data_recycle_stats;
 	struct mutex recycle_stats_collection_lock;
 	struct mutex ssr_lock;
+	atomic_t is_suspend_mode_enabled;
 };
 
 struct ipa3_plat_drv_res {
@@ -3461,6 +3467,7 @@ int ipa3_tag_process(struct ipa3_desc *desc, int num_descs,
 
 int ipa3_usb_init(void);
 void ipa3_usb_exit(void);
+int ipa3_usb_register_ready_cb(void);
 
 void ipa3_q6_pre_shutdown_cleanup(void);
 void ipa3_q6_post_shutdown_cleanup(void);
@@ -3506,6 +3513,7 @@ void ipa3_tag_destroy_imm(void *user1, int user2);
 void ipa3_uc_rg10_write_reg(enum ipahal_reg_name reg, u32 n, u32 val);
 
 int ipa3_wigig_init_i(void);
+int ipa3_wigig_deinit_i(void);
 
 /* Hardware stats */
 
@@ -3852,7 +3860,7 @@ int ipa3_update_dma_per_stats(enum ipa_per_stats_type_e stats_type, uint32_t dat
 
 /* XR-IPA API's */
 #ifdef CONFIG_IPA_RTP
-int ipa3_uc_send_tuple_info_cmd(struct traffic_tuple_info *data);
+int ipa3_uc_send_tuple_info_cmd(struct traffic_tuple_info *data, uint8_t stream_id);
 int ipa3_alloc_temp_buffs_to_uc(unsigned int size, unsigned int no_of_buffs);
 int ipa3_map_buff_to_device_addr(struct map_buffer *map_buffs);
 int ipa3_unmap_buff_from_device_addr(struct unmap_buffer *unmap_buffs);
@@ -3864,5 +3872,6 @@ int ipa3_allocate_uc_pipes_er_tr_send_to_uc(void);
 void ipa3_free_uc_temp_buffs(unsigned int no_of_buffs);
 void ipa3_free_uc_pipes_er_tr(void);
 int ipa3_uc_send_add_bitstream_buffers_cmd(struct bitstream_buffers_to_uc *data);
+void ipa3_synx_uninitialize(void);
 #endif
 #endif /* _IPA3_I_H_ */
